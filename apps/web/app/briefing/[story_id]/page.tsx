@@ -198,7 +198,7 @@ export default function BriefingPage() {
               const citations = Array.from(
                 new Set(
                   Array.from(
-                    message.content.matchAll(/\\[source:\\s*([^\\]]+)\\]/g)
+                    message.content.matchAll(/\[source:\s*([^\]]+)\]/g)
                   ).map((match) => match[1])
                 )
               );
