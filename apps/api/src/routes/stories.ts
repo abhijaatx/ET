@@ -3,8 +3,9 @@ import { desc } from "drizzle-orm";
 import { stories } from "@myet/db";
 import { db } from "../db";
 import { authMiddleware } from "../middleware/auth";
+import type { AppEnv } from "../types/app";
 
-const storiesRoutes = new Hono();
+const storiesRoutes = new Hono<AppEnv>();
 
 storiesRoutes.get("/stories", authMiddleware, async (c) => {
   const list = await db

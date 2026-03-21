@@ -5,8 +5,9 @@ import { db } from "../db";
 import { authMiddleware } from "../middleware/auth";
 import { getFrame } from "../services/frame";
 import { clamp } from "../utils/engagement";
+import type { AppEnv } from "../types/app";
 
-const feedRoutes = new Hono();
+const feedRoutes = new Hono<AppEnv>();
 
 feedRoutes.get("/feed", authMiddleware, async (c) => {
   const user = c.get("user");

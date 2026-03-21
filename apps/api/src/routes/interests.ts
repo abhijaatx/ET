@@ -3,8 +3,9 @@ import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { userEntityAffinity, userTopicInterests } from "@myet/db";
 import { eq } from "drizzle-orm";
+import type { AppEnv } from "../types/app";
 
-const interestsRoutes = new Hono();
+const interestsRoutes = new Hono<AppEnv>();
 
 interestsRoutes.get("/interests", authMiddleware, async (c) => {
   const user = c.get("user");

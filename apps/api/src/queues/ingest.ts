@@ -1,11 +1,7 @@
-import { Queue, QueueScheduler } from "bullmq";
+import { Queue } from "bullmq";
 import { redis } from "../redis";
 
 export const ingestQueue = new Queue("ingest", {
-  connection: redis
-});
-
-export const ingestScheduler = new QueueScheduler("ingest", {
   connection: redis
 });
 

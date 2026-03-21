@@ -7,8 +7,9 @@ import { lucia } from "../auth";
 import { setCookie } from "hono/cookie";
 import argon2 from "argon2";
 import { authMiddleware } from "../middleware/auth";
+import type { AppEnv } from "../types/app";
 
-const authRoutes = new Hono();
+const authRoutes = new Hono<AppEnv>();
 
 const credentialsSchema = z.object({
   email: z.string().email(),

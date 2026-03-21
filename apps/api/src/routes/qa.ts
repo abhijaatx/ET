@@ -6,8 +6,9 @@ import { articles, stories, userTopicInterests } from "@myet/db";
 import { db } from "../db";
 import { authMiddleware } from "../middleware/auth";
 import { streamAnswer } from "../services/qa";
+import type { AppEnv } from "../types/app";
 
-const qaRoutes = new Hono();
+const qaRoutes = new Hono<AppEnv>();
 
 const questionSchema = z.object({
   question: z.string().min(2),
@@ -64,7 +65,7 @@ qaRoutes.post("/briefing/:storyId/ask", authMiddleware, async (c) => {
       history: body.history,
       question: body.question,
       signal: c.req.raw.signal,
-      onToken: async (token) => {
+      onToken: async (token: string) => {
         await stream.writeSSE({ data: token });
       }
     });

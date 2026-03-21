@@ -4,8 +4,9 @@ import { articles, stories, userTopicInterests } from "@myet/db";
 import { db } from "../db";
 import { authMiddleware } from "../middleware/auth";
 import { generateBriefing } from "../services/briefing";
+import type { AppEnv } from "../types/app";
 
-const briefingRoutes = new Hono();
+const briefingRoutes = new Hono<AppEnv>();
 
 briefingRoutes.get("/briefing/:storyId", authMiddleware, async (c) => {
   const storyId = c.req.param("storyId");

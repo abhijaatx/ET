@@ -11,8 +11,9 @@ import qaRoutes from "./routes/qa";
 import interestsRoutes from "./routes/interests";
 import { enqueueImmediateIngest, scheduleIngest } from "./queues/ingest";
 import "./workers/ingest";
+import type { AppEnv } from "./types/app";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
 app.use(
   "*",
@@ -32,10 +33,10 @@ app.route("/api", briefingRoutes);
 app.route("/api", qaRoutes);
 app.route("/api", interestsRoutes);
 
-scheduleIngest().catch((err) => {
+scheduleIngest().catch((err: unknown) => {
   console.error("Failed to schedule ingest", err);
 });
-enqueueImmediateIngest().catch((err) => {
+enqueueImmediateIngest().catch((err: unknown) => {
   console.error("Failed to enqueue initial ingest", err);
 });
 

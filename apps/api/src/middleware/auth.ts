@@ -1,8 +1,9 @@
 import type { Context, Next } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { lucia } from "../auth";
+import type { AppEnv } from "../types/app";
 
-export async function authMiddleware(c: Context, next: Next) {
+export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   const sessionId = getCookie(c, lucia.sessionCookieName);
   if (!sessionId) {
     c.set("user", null);

@@ -17,3 +17,12 @@ export const lucia = new Lucia(adapter, {
 });
 
 export type AuthUser = typeof users.$inferSelect;
+
+declare module "lucia" {
+  interface Register {
+    Lucia: typeof lucia;
+    DatabaseUserAttributes: {
+      email: string;
+    };
+  }
+}

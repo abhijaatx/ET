@@ -6,8 +6,9 @@ import { articleSignals, articles } from "@myet/db";
 import { eq } from "drizzle-orm";
 import { calculateEngagementScore } from "../utils/engagement";
 import { updateInterestGraphForSignal } from "../services/interest";
+import type { AppEnv } from "../types/app";
 
-const signalsRoutes = new Hono();
+const signalsRoutes = new Hono<AppEnv>();
 
 const signalSchema = z.object({
   article_id: z.string().uuid(),
