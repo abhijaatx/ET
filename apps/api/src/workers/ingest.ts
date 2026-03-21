@@ -40,13 +40,14 @@ export const ingestWorker = new Worker(
       const embedding = await embedText(`${raw.title}\n${raw.content}`);
       const embeddingVector = sql`${`[${embedding.join(",")}]`}::vector`;
 
-      const nearest = await db.execute(
+      const nearest = (await db.execute(
         sql`SELECT story_id FROM articles WHERE embedding <=> ${embeddingVector} < 0.18 ORDER BY embedding <=> ${embeddingVector} LIMIT 1`
-      );
+      )) as { rows: { story_id: string | null }[] };
 
       let storyId: string | null = null;
-      if (nearest.rows.length > 0 && nearest.rows[0]?.story_id) {
-        storyId = String(nearest.rows[0].story_id);
+      const nearestRow = nearest.rows[0];
+      if (nearestRow?.story_id) {
+        storyId = String(nearestRow.story_id);
       }
 
       const tag = await tagArticle({ title: raw.title, content: raw.content });

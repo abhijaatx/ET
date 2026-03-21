@@ -31,7 +31,7 @@ export async function streamAnswer(params: {
     .join("\n\n");
 
   await callAnthropic(async () => {
-    const stream = await anthropic.messages.stream({
+    const stream = (await anthropic.messages.stream({
       model: "claude-sonnet-4-6",
       max_tokens: 1000,
       temperature: 0.2,
@@ -48,11 +48,11 @@ export async function streamAnswer(params: {
           content: params.question
         }
       ]
-    });
+    })) as AsyncIterable<StreamEvent> & { controller?: AbortController };
 
     for await (const event of stream) {
       if (params.signal?.aborted) {
-        stream.controller.abort();
+        stream.controller?.abort();
         break;
       }
 
