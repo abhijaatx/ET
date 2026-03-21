@@ -1,0 +1,29 @@
+import type { Context, Next } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
+import { lucia } from "../auth";
+
+export async function authMiddleware(c: Context, next: Next) {
+  const sessionId = getCookie(c, lucia.sessionCookieName);
+  if (!sessionId) {
+    c.set("user", null);
+    c.set("session", null);
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const { session, user } = await lucia.validateSession(sessionId);
+  if (session && session.fresh) {
+    const sessionCookie = lucia.createSessionCookie(session.id);
+    setCookie(c, sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+  }
+  if (!session) {
+    const sessionCookie = lucia.createBlankSessionCookie();
+    setCookie(c, sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+    c.set("user", null);
+    c.set("session", null);
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  c.set("user", user);
+  c.set("session", session);
+  await next();
+}
