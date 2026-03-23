@@ -7,28 +7,19 @@ import { redis } from "../redis";
 import { embedText } from "../services/embeddings";
 import { fetchAllArticles } from "../services/news";
 import { tagArticle } from "../services/tagging";
-import { callAnthropic, anthropic } from "../services/anthropic";
+import { callGroq, groqCompletion } from "../services/anthropic";
 
 async function generateHeadline(title: string, summary: string) {
-  return callAnthropic(async () => {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 40,
-      temperature: 0.3,
-      system: "Generate a canonical headline for this story.",
-      messages: [
-        {
-          role: "user",
-          content: `Title: ${title}\nSummary: ${summary}\nReturn a concise canonical headline.`
-        }
-      ]
+  try {
+    return await callGroq(async () => {
+      return await groqCompletion(
+        "Generate a canonical headline for this story.",
+        `Title: ${title}\nSummary: ${summary}\nReturn ONLY a concise canonical headline, with no extra text or quotation marks.`
+      );
     });
-
-    return message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("")
-      .trim();
-  });
+  } catch (e) {
+    return title;
+  }
 }
 
 export const ingestWorker = new Worker(
@@ -54,6 +45,9 @@ export const ingestWorker = new Worker(
       const headline = storyId
         ? null
         : await generateHeadline(raw.title, tag.summary);
+
+      // Add a small delay to avoid hitting Groq's rate limit during batch processing
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       await db.transaction(async (tx) => {
         const existing = await tx
@@ -134,7 +128,7 @@ export const ingestWorker = new Worker(
     }
   },
   {
-    connection: redis
+    connection: redis as any
   }
 );
 

@@ -1,65 +1,62 @@
-import { callAnthropic, anthropic } from "./anthropic";
+import { streamGroqCompletion, callGroq } from "./anthropic";
 
-export type ChatMessage = { role: "user" | "assistant"; content: string };
-
-type StreamEvent = {
-  type?: string;
-  delta?: { type?: string; text?: string };
+type ArticleContext = {
+  id: string;
+  title: string;
+  content: string;
 };
 
-function isTextDelta(event: StreamEvent): event is Required<StreamEvent> {
-  return (
-    event.type === "content_block_delta" &&
-    event.delta?.type === "text_delta" &&
-    typeof event.delta.text === "string"
-  );
-}
-
-export async function streamAnswer(params: {
+type StreamAnswerParams = {
   depthTier: string;
-  articles: { id: string; title: string; content: string }[];
-  history: ChatMessage[];
+  articles: ArticleContext[];
+  history: { role: string; content: string }[];
   question: string;
+  onToken: (token: string) => Promise<void>;
   signal?: AbortSignal;
-  onToken: (token: string) => Promise<void> | void;
-}) {
+};
+
+export async function streamAnswer(params: StreamAnswerParams) {
   const context = params.articles
-    .map(
-      (article) =>
-        `Article ${article.id}\nTitle: ${article.title}\nContent: ${article.content}`
-    )
-    .join("\n\n");
+    .map((a) => `[Source: ${a.id}]\nTitle: ${a.title}\nContent: ${a.content}`)
+    .join("\n\n---\n\n");
 
-  await callAnthropic(async () => {
-    const stream = (await anthropic.messages.stream({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      temperature: 0.2,
-      system:
-        "You are an expert financial journalist. Every factual claim must include [source: article_id]. Never use information not present in the provided articles. If the question cannot be answered from the articles, respond: 'I can't find that in the ET coverage of this story.' and then add what can be said instead with citations.",
-      messages: [
-        {
-          role: "user",
-          content: `User depth tier: ${params.depthTier}\n\n${context}`
-        },
-        ...params.history,
-        {
-          role: "user",
-          content: params.question
-        }
-      ]
-    })) as AsyncIterable<StreamEvent> & { controller?: AbortController };
+  // Strict sanitization of history for Groq SDK
+  const sanitizedHistory = params.history
+    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(m => ({
+      role: m.role as "user" | "assistant",
+      content: m.content
+    }));
 
-    for await (const event of stream) {
-      if (params.signal?.aborted) {
-        stream.controller?.abort();
-        break;
-      }
+  const systemPrompt = `You are a Senior Markets Correspondent at The Economic Times. 
+Your goal is to provide sharp, insightful, and concise answers based EXCLUSIVELY on the provided context articles. 
 
-      const typed = event as StreamEvent;
-      if (isTextDelta(typed)) {
-        await params.onToken(typed.delta.text);
-      }
-    }
+Rules:
+1. ONLY use the provided context. If information is missing, say: 'This specific detail isn't covered in our current ET briefing.'
+2. BE CONCISE. Do not repeat facts unnecessarily. Get to the point.
+3. ADAPT STYLE to depth tier:
+   - 'explainer': Clear, introductory, jargon-free.
+   - 'analyst': Data-focused, identifying trends and impacts.
+   - 'executive': High-level strategic takeaways, 'so-what' focus.
+4. NO CITATIONS: Do NOT include [source: id], source numbers, or citations of any kind. Deliver the information as a fluid narrative.
+5. NO OUTSIDE KNOWLEDGE. You are a closed-system researcher for this story.
+6. NO AI MENTIONS. Talk like a seasoned journalist speaking to a subscriber.`;
+
+  const userPrompt = `Analysis Depth: ${params.depthTier}
+---
+[CONTEXT ARTICLES]
+${context}
+---
+[SUBSCRIBER QUESTION]
+${params.question}`;
+
+  await callGroq(async () => {
+    await streamGroqCompletion(
+      systemPrompt,
+      userPrompt,
+      sanitizedHistory,
+      params.onToken,
+      params.signal
+    );
   });
 }

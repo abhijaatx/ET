@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import { redis } from "../redis";
 
 export const ingestQueue = new Queue("ingest", {
-  connection: redis
+  connection: redis as any
 });
 
 export async function scheduleIngest() {
@@ -23,7 +23,9 @@ export async function enqueueImmediateIngest() {
     {
       jobId: `ingest-initial-${Date.now()}`,
       removeOnComplete: true,
-      removeOnFail: true
+      removeOnFail: true,
+      attempts: 5,
+      backoff: { type: "exponential", delay: 5000 }
     }
   );
 }

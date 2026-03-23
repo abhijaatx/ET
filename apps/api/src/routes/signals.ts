@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { articleSignals, articles } from "@myet/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { calculateEngagementScore } from "../utils/engagement";
 import { updateInterestGraphForSignal } from "../services/interest";
 import type { AppEnv } from "../types/app";
@@ -16,7 +16,8 @@ const signalSchema = z.object({
   scroll_depth: z.number().min(0).max(1),
   opened_briefing: z.boolean().optional().default(false),
   shared: z.boolean().optional().default(false),
-  saved: z.boolean().optional().default(false)
+  saved: z.boolean().optional().default(false),
+  liked: z.boolean().optional().default(false)
 });
 
 signalsRoutes.post("/signals", authMiddleware, async (c) => {
@@ -33,34 +34,78 @@ signalsRoutes.post("/signals", authMiddleware, async (c) => {
   const content = article[0]?.content ?? "";
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
 
-  const engagementScore = calculateEngagementScore({
-    wordCount,
-    timeSpentS: body.time_spent_s,
-    scrollDepth: body.scroll_depth,
-    openedBriefing: body.opened_briefing,
-    shared: body.shared,
-    saved: body.saved
-  });
+  const existing = await db
+    .select()
+    .from(articleSignals)
+    .where(
+      and(
+        eq(articleSignals.userId, user!.id),
+        eq(articleSignals.articleId, body.article_id)
+      )
+    )
+    .limit(1);
 
-  await db.insert(articleSignals).values({
-    userId: user.id,
-    articleId: body.article_id,
-    timeSpentS: body.time_spent_s,
-    scrollDepth: body.scroll_depth,
-    openedBriefing: body.opened_briefing,
-    shared: body.shared,
-    saved: body.saved,
-    sessionId: session.id,
-    engagementScore
-  });
+  let finalEngagementScore = 0;
+
+  if (existing[0]) {
+    const s = existing[0];
+    const newTimeSpentS = (s.timeSpentS ?? 0) + body.time_spent_s;
+    const newScrollDepth = Math.max(s.scrollDepth ?? 0, body.scroll_depth);
+    
+    finalEngagementScore = calculateEngagementScore({
+      wordCount,
+      timeSpentS: newTimeSpentS,
+      scrollDepth: newScrollDepth,
+      openedBriefing: body.opened_briefing || s.openedBriefing,
+      shared: body.shared || s.shared,
+      saved: body.saved, // Use current body value for toggle
+      liked: body.liked  // Use current body value for toggle
+    });
+
+    await db
+      .update(articleSignals)
+      .set({
+        timeSpentS: newTimeSpentS,
+        scrollDepth: newScrollDepth,
+        openedBriefing: body.opened_briefing || s.openedBriefing,
+        shared: body.shared || s.shared,
+        saved: body.saved,
+        liked: body.liked,
+        engagementScore: finalEngagementScore,
+        createdAt: new Date() // Update timestamp to reflect latest interaction
+      })
+      .where(eq(articleSignals.id, s.id));
+  } else {
+    finalEngagementScore = calculateEngagementScore({
+      wordCount,
+      timeSpentS: body.time_spent_s,
+      scrollDepth: body.scroll_depth,
+      openedBriefing: body.opened_briefing,
+      shared: body.shared,
+      saved: body.saved,
+      liked: body.liked
+    });
+    await db.insert(articleSignals).values({
+      userId: user!.id,
+      articleId: body.article_id,
+      timeSpentS: body.time_spent_s,
+      scrollDepth: body.scroll_depth,
+      openedBriefing: body.opened_briefing,
+      shared: body.shared,
+      saved: body.saved,
+      liked: body.liked,
+      sessionId: session!.id,
+      engagementScore: finalEngagementScore
+    });
+  }
 
   await updateInterestGraphForSignal({
-    userId: user.id,
+    userId: user!.id,
     articleId: body.article_id,
-    engagementScore
+    engagementScore: finalEngagementScore
   });
 
-  return c.json({ ok: true, engagementScore });
+  return c.json({ ok: true, engagementScore: finalEngagementScore });
 });
 
 export default signalsRoutes;

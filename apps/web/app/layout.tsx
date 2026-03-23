@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Sidebar } from "../components/Sidebar";
+import { TrendingSidebar } from "../components/TrendingSidebar";
+import { MobileNav } from "../components/MobileNav";
 
 export const metadata: Metadata = {
-  title: "My ET + News Navigator",
-  description: "AI-native financial news briefing and personalized feed"
+  title: "News Navigator",
+  description: "AI-native financial news in a social-first interface"
 };
+
+import { AuthorProfileProvider } from "../context/AuthorProfileContext";
 
 export default function RootLayout({
   children
@@ -13,13 +18,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#ffffff_0%,_#f8f4ee_45%,_#efe6d8_100%)]">
-          <div className="mx-auto max-w-6xl px-6 pb-24">
-            {children}
-          </div>
-        </div>
+      <body className="antialiased bg-paper font-sans">
+        <AuthorProfileProvider>
+          {children}
+        </AuthorProfileProvider>
+
+        {/* Mobile Navigation */}
+        <MobileNav />
       </body>
     </html>
   );
 }
+
+
+

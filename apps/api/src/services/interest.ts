@@ -3,7 +3,8 @@ import {
   articleSignals,
   articles,
   userEntityAffinity,
-  userTopicInterests
+  userTopicInterests,
+  users
 } from "@myet/db";
 import { db } from "../db";
 import { clamp } from "../utils/engagement";
@@ -176,7 +177,33 @@ export async function updateInterestGraphForSession(
         lastSeenAt: now
       });
     }
+
+    // Two-Tower Model: Update User Embedding Vector
+    if (signal.engagementScore && signal.engagementScore > 0.1) {
+      const article = await db.select({ embedding: articles.embedding }).from(articles).where(eq(articles.id, signal.articleId)).limit(1);
+      if (article[0]?.embedding) {
+        await updateUserEmbedding(userId, article[0].embedding, signal.engagementScore);
+      }
+    }
   }
+}
+
+export async function updateUserEmbedding(userId: string, articleEmbedding: number[], engagementScore: number) {
+  const user = await db.select({ embedding: users.embedding }).from(users).where(eq(users.id, userId)).limit(1);
+  const foundUser = user[0];
+  if (!foundUser) return;
+
+  const alpha = 0.1 * clamp(engagementScore, 0, 1); // Learning rate
+  let newEmbedding: number[];
+
+  if (!foundUser.embedding || foundUser.embedding.every(v => v === 0)) {
+    newEmbedding = articleEmbedding;
+  } else {
+    const currentEmb = foundUser.embedding;
+    newEmbedding = currentEmb.map((val, i) => val * (1 - alpha) + (articleEmbedding[i] ?? 0) * alpha);
+  }
+
+  await db.update(users).set({ embedding: newEmbedding }).where(eq(users.id, userId));
 }
 
 export async function updateInterestGraphForSignal(params: {
@@ -185,7 +212,7 @@ export async function updateInterestGraphForSignal(params: {
   engagementScore: number;
 }) {
   const article = await db
-    .select({ topicSlugs: articles.topicSlugs, entities: articles.entities })
+    .select({ topicSlugs: articles.topicSlugs, entities: articles.entities, embedding: articles.embedding })
     .from(articles)
     .where(eq(articles.id, params.articleId))
     .limit(1);
@@ -298,5 +325,10 @@ export async function updateInterestGraphForSignal(params: {
           lastSeenAt: now
         }
       });
+  }
+
+  // Two-Tower Model: Update User Embedding Vector
+  if (params.engagementScore > 0.1 && found.embedding) {
+    await updateUserEmbedding(params.userId, found.embedding, params.engagementScore);
   }
 }

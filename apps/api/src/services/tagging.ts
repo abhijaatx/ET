@@ -1,5 +1,4 @@
-import { callAnthropic, anthropic } from "./anthropic";
-import { TOPIC_TAXONOMY } from "./taxonomy";
+import { callGroq, groqCompletion } from "./anthropic";
 
 export type TaggedArticle = {
   topicSlugs: string[];
@@ -8,48 +7,68 @@ export type TaggedArticle = {
   summary: string;
 };
 
-const taxonomyList = TOPIC_TAXONOMY.join(", ");
-
 export async function tagArticle(params: {
   title: string;
   content: string;
+  initialCategory?: string;
 }) {
-  return callAnthropic(async () => {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      temperature: 0.2,
-      system:
-        "You are a financial news tagger. Return only valid JSON with keys: topic_slugs (max 4, from the provided taxonomy), entities (array of {name, type}), article_type, summary (2 sentences).",
-      messages: [
+  try {
+    const res = await callGroq(async () => {
+      return await groqCompletion(
+        "You are an expert news editor. Categorize the following article into ONE OR MORE of these high-level segments: technology, world, policy, business, markets, wealth, science. Also extract key entities and provide a 2-sentence summary. Return ONLY valid JSON.",
+        `Title: ${params.title}\nContent: ${params.content.substring(0, 500)}\n\nExpected JSON format:
         {
-          role: "user",
-          content: `Taxonomy: ${taxonomyList}\n\nTitle: ${params.title}\nContent: ${params.content}`
-        }
-      ]
+          "topicSlugs": ["technology", "world"],
+          "entities": [{"name": "Apple", "type": "company"}],
+          "articleType": "news",
+          "summary": "..."
+        }`
+      );
     });
 
-    const text = message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("")
-      .trim();
+    const parsed = JSON.parse(res) as TaggedArticle;
+    
+    // Enforce taxonomy and normalize slugs
+    const ALLOWED_TOPICS = ["technology", "world", "policy", "business", "markets", "wealth", "science"];
+    const normalizedSlugs = new Set<string>();
 
-    const parsed = JSON.parse(text) as {
-      topic_slugs: string[];
-      entities: { name: string; type: string }[];
-      article_type: TaggedArticle["articleType"];
-      summary: string;
-    };
+    parsed.topicSlugs.forEach(slug => {
+      const s = slug.toLowerCase().trim();
+      if (s.includes("tech")) normalizedSlugs.add("technology");
+      else if (s.includes("polic") || s.includes("polit")) normalizedSlugs.add("policy");
+      else if (s.includes("world") || s.includes("global") || s.includes("international")) normalizedSlugs.add("world");
+      else if (s.includes("market") || s.includes("stoc")) normalizedSlugs.add("markets");
+      else if (s.includes("wealth") || s.includes("finance")) normalizedSlugs.add("wealth");
+      else if (s.includes("science")) normalizedSlugs.add("science");
+      else if (s.includes("busines") || s.includes("economy")) normalizedSlugs.add("business");
+    });
 
-    const filteredTopics = parsed.topic_slugs.filter((slug) =>
-      TOPIC_TAXONOMY.includes(slug as (typeof TOPIC_TAXONOMY)[number])
-    );
+    if (params.initialCategory) {
+        const s = params.initialCategory.toLowerCase().trim();
+        if (ALLOWED_TOPICS.includes(s)) normalizedSlugs.add(s);
+    }
+
+    parsed.topicSlugs = Array.from(normalizedSlugs);
+    if (parsed.topicSlugs.length === 0) parsed.topicSlugs.push("business");
+
+    return parsed;
+  } catch (err) {
+    console.error("AI Tagging failed, falling back to keywords:", err);
+    // Fallback to previous keyword logic if AI fails
+    const categories = new Set<string>();
+    if (params.initialCategory) categories.add(params.initialCategory);
+    const text = (params.title + " " + params.content).toLowerCase();
+    if (text.includes("tech")) categories.add("technology");
+    if (text.includes("politics") || text.includes("policy")) categories.add("policy");
+    if (text.includes("world")) categories.add("world");
+    if (text.includes("stock") || text.includes("market")) categories.add("markets");
+    if (categories.size === 0) categories.add("business");
 
     return {
-      topicSlugs: filteredTopics.slice(0, 4),
-      entities: parsed.entities,
-      articleType: parsed.article_type,
-      summary: parsed.summary
+      topicSlugs: Array.from(categories),
+      entities: [],
+      articleType: "news",
+      summary: params.content.substring(0, 150) + "..."
     } satisfies TaggedArticle;
-  });
+  }
 }

@@ -1,10 +1,24 @@
-import { callAnthropic, anthropic } from "./anthropic";
+import { callGroq, groqCompletion } from "./anthropic";
+import fs from "fs/promises";
+import path from "path";
+
+const DATA_DIR = path.join(process.cwd(), "data", "briefings");
 
 export async function generateBriefing(params: {
   storyId: string;
   depthTier: string;
   articles: { id: string; title: string; content: string; url: string; author: string | null; publishedAt: Date | null }[];
 }) {
+  // Try to load from file-system cache first
+  const cachePath = path.join(DATA_DIR, `${params.storyId}.json`);
+  try {
+    const cached = await fs.readFile(cachePath, "utf-8");
+    console.log(`[Briefing] Serving from disk cache: ${params.storyId}`);
+    return JSON.parse(cached);
+  } catch (err) {
+    // Cache miss, proceed to generation
+  }
+
   const context = params.articles
     .map(
       (article) =>
@@ -12,26 +26,40 @@ export async function generateBriefing(params: {
     )
     .join("\n\n");
 
-  return callAnthropic(async () => {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1200,
-      temperature: 0.2,
-      system:
-        "You are an expert financial journalist. Synthesise the provided ET articles into a structured briefing. Rules:\n- Every factual claim must include [source: article_id] inline\n- Never use information not present in the provided articles\n- If articles conflict on a figure, surface the conflict explicitly\n- Return ONLY valid JSON matching the BriefingDocument schema, no preamble",
-      messages: [
-        {
-          role: "user",
-          content: `Story ID: ${params.storyId}\nUser depth tier: ${params.depthTier}\n\n${context}\n\nReturn JSON with keys: story_id, headline, generated_at, depth_tier, summary { text, citations }, sections [{ id, title, content, citations }], key_entities [{ name, type, role }], suggested_questions, source_articles [{ id, title, url, author, published_at }]. Sections must include what-happened, why-it-matters, the-numbers (only if depth_tier is informed or expert), the-other-side (only if conflicting viewpoints exist).`
-        }
-      ]
-    });
+  const briefing = await callGroq(async () => {
+    const text = await groqCompletion(
+      "You are a Lead Intelligence Analyst at The Economic Times. Synthesise the provided articles into a high-stakes 'Deep Briefing'.",
+      `Story context:
+${context}
 
-    const text = message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("")
-      .trim();
+Instructions:
+1. Synthesise ALL provided articles into a singular, cohesive intelligence report.
+2. Identify core 'Themes' or 'Arguments' across the coverage.
+3. If details conflict (e.g. different deficit figures), highlight the discrepancy explicitly.
+4. Use a professional, insider tone (Junior Analyst -> Expert Correspondent transition based on depth_tier).
+5. Return ONLY valid JSON with keys:
+   - story_id: ${params.storyId}
+   - headline: A sharp, analytical title.
+   - executive_summary: A high-impact 'Bottom Line' paragraph (2-3 sentences).
+   - sections: Array of objects { id, title, content, citations: [article_ids] }. Sections should be thematic (e.g. 'The Market Response', 'Political Headwinds', 'Policy Nuances').
+   - key_entities: [{ name, type, role }]
+   - suggested_questions: 3 specific, inquisitive follow-up questions to deepen the conversation.
+   - source_articles: The original article metadata provided.
+
+No preamble. No markdown wrapping.`
+    );
 
     return JSON.parse(text);
   });
+
+  // Save to file-system cache
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(cachePath, JSON.stringify(briefing, null, 2), "utf-8");
+    console.log(`[Briefing] Cached to disk: ${params.storyId}`);
+  } catch (err) {
+    console.error(`[Briefing] Failed to cache to disk: ${params.storyId}`, err);
+  }
+
+  return briefing;
 }

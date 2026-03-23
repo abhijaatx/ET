@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 async function run() {
   const migrationPath = path.resolve(
     __dirname,
-    "../../../packages/db/migrations/0000_init.sql"
+    "../../../../packages/db/migrations/0000_init.sql"
   );
   const sql = fs.readFileSync(migrationPath, "utf-8");
   await pool.query(sql);

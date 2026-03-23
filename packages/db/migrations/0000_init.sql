@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS "articles" (
   "content" text NOT NULL,
   "summary" text NOT NULL,
   "url" text NOT NULL,
+  "image_url" text,
   "source" text NOT NULL,
   "author" text,
   "published_at" timestamp,

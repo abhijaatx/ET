@@ -9,6 +9,7 @@ export function calculateEngagementScore(params: {
   openedBriefing: boolean;
   shared: boolean;
   saved: boolean;
+  liked: boolean;
 }) {
   const estReadTimeS = (params.wordCount / 3.5) * 60;
   const ratio =
@@ -18,7 +19,7 @@ export function calculateEngagementScore(params: {
   const base = ratio * params.scrollDepth;
   const multiplier = params.openedBriefing
     ? 1.5
-    : params.shared || params.saved
+    : params.shared || params.saved || params.liked
     ? 2.0
     : 1.0;
   return clamp(base * multiplier, 0, 1);

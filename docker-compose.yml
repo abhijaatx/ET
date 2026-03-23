@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -25,26 +25,32 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/myet
       - REDIS_URL=redis://redis:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - NEWSAPI_KEY=${NEWSAPI_KEY}
       - GNEWS_KEY=${GNEWS_KEY}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - PORT=3001
+      - NODE_OPTIONS=--dns-result-order=ipv4first
     depends_on:
       - postgres
       - redis
+    command: ["sh", "-c", "npm run db:migrate --workspace apps/api && npm run start --workspace apps/api"]
     restart: unless-stopped
 
   worker:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    command: node dist/worker.js
+    command: ["sh", "-c", "npx tsx apps/api/src/workers/ingest.ts"]
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/myet
       - REDIS_URL=redis://redis:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - NEWSAPI_KEY=${NEWSAPI_KEY}
       - GNEWS_KEY=${GNEWS_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NODE_OPTIONS=--dns-result-order=ipv4first
     depends_on:
       - postgres
       - redis

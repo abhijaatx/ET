@@ -28,6 +28,17 @@ const vector = customType<{ data: number[]; driverData: string }>({
   }
 });
 
+export const authors = pgTable("authors", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().unique(),
+  handle: text("handle").notNull().unique(),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  followersCount: integer("followers_count").notNull().default(0),
+  genres: text("genres").array().notNull().default([]), // e.g. ["Business", "Tech"]
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});
+
 export const stories = pgTable("stories", {
   id: uuid("id").defaultRandom().primaryKey(),
   headline: text("headline").notNull(),
@@ -52,10 +63,12 @@ export const articles = pgTable(
     url: text("url").notNull(),
     source: text("source").notNull(),
     author: text("author"),
+    authorId: uuid("author_id").references(() => authors.id),
     publishedAt: timestamp("published_at"),
     topicSlugs: text("topic_slugs").array().notNull().default([]),
     entities: jsonb("entities").notNull().default([]),
     storyId: uuid("story_id").references(() => stories.id),
+    imageUrl: text("image_url"),
     embedding: vector("embedding"),
     articleType: text("article_type").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow()
@@ -69,6 +82,7 @@ export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  embedding: vector("embedding"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
 
@@ -137,11 +151,53 @@ export const articleSignals = pgTable("article_signals", {
   openedBriefing: boolean("opened_briefing").notNull().default(false),
   shared: boolean("shared").notNull().default(false),
   saved: boolean("saved").notNull().default(false),
+  liked: boolean("liked").notNull().default(false),
   engagementScore: real("engagement_score"),
   sessionId: text("session_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
 
+export const userAuthorFollows = pgTable(
+  "user_author_follows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => authors.id),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (table) => ({
+    uniqueUserAuthor: uniqueIndex("user_author_unique").on(
+      table.userId,
+      table.authorId
+    )
+  })
+);
+
+export const userStoryFollows = pgTable(
+  "user_story_follows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    storyId: uuid("story_id")
+      .notNull()
+      .references(() => stories.id),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (table) => ({
+    uniqueUserStory: uniqueIndex("user_story_unique").on(
+      table.userId,
+      table.storyId
+    )
+  })
+);
+
 export type Article = typeof articles.$inferSelect;
 export type Story = typeof stories.$inferSelect;
 export type User = typeof users.$inferSelect;
+export type Author = typeof authors.$inferSelect;

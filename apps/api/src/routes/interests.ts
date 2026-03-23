@@ -12,12 +12,12 @@ interestsRoutes.get("/interests", authMiddleware, async (c) => {
   const topics = await db
     .select()
     .from(userTopicInterests)
-    .where(eq(userTopicInterests.userId, user.id));
+    .where(eq(userTopicInterests.userId, user!.id));
 
   const entities = await db
     .select()
     .from(userEntityAffinity)
-    .where(eq(userEntityAffinity.userId, user.id));
+    .where(eq(userEntityAffinity.userId, user!.id));
 
   return c.json({ topics, entities });
 });
