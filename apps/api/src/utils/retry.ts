@@ -13,17 +13,20 @@ export async function withRetry<T>(
       
       // Handle 429 Rate Limit
       let delay = options.baseDelayMs * Math.pow(2, attempt);
-      if (error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("rate limit")) {
-        // More aggressive delay for rate limits
-        delay = Math.max(delay, 2000 * Math.pow(2, attempt));
+      if (error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("rate limit") || error?.message?.includes("Quota exceeded")) {
+        // AI API Rate Limit: Wait exactly 1 minute
+        console.warn(`[Retry] Rate limit hit. Waiting 60s before retry...`);
+        delay = 60000;
+        // No jitter for fixed rate limit wait
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        // Add Jitter for non-rate limit errors
+        const jitter = Math.random() * 200;
+        await new Promise((resolve) => setTimeout(resolve, delay + jitter));
       }
-
-      // Add Jitter
-      const jitter = Math.random() * 200;
-      await new Promise((resolve) => setTimeout(resolve, delay + jitter));
       
       attempt += 1;
-      console.warn(`[Retry] Attempt ${attempt} failed. Retrying in ${Math.round(delay + jitter)}ms...`);
+      console.warn(`[Retry] Attempt ${attempt} failed: ${error.message || error}.`);
     }
   }
 

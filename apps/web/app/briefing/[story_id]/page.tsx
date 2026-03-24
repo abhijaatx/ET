@@ -8,7 +8,7 @@ import { TopNav } from "../../../components/TopNav";
 import { useAuthorProfile } from "../../../context/AuthorProfileContext";
 import { PremiumAd } from "../../../components/PremiumAd";
 import { BriefingStoryArc, type StoryArcData } from "../../../components/BriefingStoryArc";
-import { LineChart, LayoutGrid, BookOpen, MessageSquare } from "lucide-react";
+import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star } from "lucide-react";
 
 const STOCK_PHOTO = "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
 
@@ -69,6 +69,38 @@ export default function BriefingPage() {
   // Mobile state: 'left' (Briefing/Arc) or 'right' (Articles)
   const [activePane, setActivePane] = useState<"left" | "right">("left");
   const [activeSource, setActiveSource] = useState<ArticleItem | null>(null);
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchFollowStatus = async () => {
+      try {
+        const res = await fetch("/api/stories/followed", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          const followed = data.stories.some((s: any) => s.id === storyId);
+          setIsFollowed(followed);
+        }
+      } catch {}
+    };
+    fetchFollowStatus();
+  }, [storyId]);
+
+  const toggleFollow = async () => {
+    setFollowLoading(true);
+    try {
+      const method = isFollowed ? "DELETE" : "POST";
+      const endpoint = isFollowed ? `/api/stories/${storyId}/unfollow` : `/api/stories/${storyId}/follow`;
+      const res = await fetch(endpoint, { method, credentials: "include" });
+      if (res.ok) {
+        setIsFollowed(!isFollowed);
+      }
+    } catch (e) {
+      console.error("Failed to toggle follow:", e);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchArticles = async () => {
@@ -76,7 +108,22 @@ export default function BriefingPage() {
         const res = await fetch(`/api/articles/${storyId}`, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
-          setArticles(data.articles ?? []);
+          setArticles((prev) => {
+            const raw = data.articles ?? [];
+            const seen = new Set<string>();
+            const unique: ArticleItem[] = [];
+            
+            [...prev, ...raw].forEach(a => {
+              const key = `${a.id}-${a.title}`;
+              if (!seen.has(key) && !seen.has(a.id) && !seen.has(a.title)) {
+                seen.add(a.id);
+                seen.add(a.title);
+                seen.add(key);
+                unique.push(a);
+              }
+            });
+            return unique;
+          });
           setArticlesLoaded(true);
           if (sourceId) {
             const found = (data.articles ?? []).find((a: ArticleItem) => a.id === sourceId);
@@ -98,20 +145,40 @@ export default function BriefingPage() {
       try {
         setBriefingError(null);
         const res = await fetch(`/api/briefing/${storyId}`, { credentials: "include" });
-        if (res.ok) {
+        if (res.status === 200) {
           const data = (await res.json()) as BriefingDocument;
-          setBriefing(data);
-          setArticles((prev) => {
-            const briefingArticles = data.source_articles || [];
-            const updated = prev.map(p => {
-              const match = briefingArticles.find(s => s.id === p.id);
-              return match ? { ...p, ...match } : p;
+          // Ensure it's not an error object cast to BriefingDocument
+          if (data && 'sections' in data) {
+            setBriefing(data);
+            setArticles((prev) => {
+              const briefingArticles = data.source_articles || [];
+              const all = [...prev, ...briefingArticles.map(s => ({ ...s, published_at: s.published_at || null }))];
+              
+              const seen = new Set<string>();
+              const unique: ArticleItem[] = [];
+              
+              all.forEach(a => {
+                const key = `${a.id}-${a.title}`;
+                if (!seen.has(key) && !seen.has(a.id) && !seen.has(a.title)) {
+                  seen.add(a.id);
+                  seen.add(a.title);
+                  seen.add(key);
+                  unique.push(a);
+                }
+              });
+              return unique;
             });
-            const newArticles = briefingArticles.filter(s => !prev.some(p => p.id === s.id));
-            return [...updated, ...newArticles.map(s => ({ ...s, published_at: s.published_at || null }))];
-          });
+          }
+        } else if (res.status === 202) {
+          // Poll every 5 seconds if not ready
+          setTimeout(fetchBriefing, 5000);
+        } else {
+          const errorData = await res.json();
+          setBriefingError(errorData.error || "Failed to load briefing");
         }
-      } catch {}
+      } catch (err) {
+        console.error("Fetch briefing error:", err);
+      }
     };
     fetchBriefing();
   }, [storyId]);
@@ -122,9 +189,14 @@ export default function BriefingPage() {
       setArcLoading(true);
       try {
         const res = await fetch(`/api/story-arc/${storyId}`, { credentials: "include" });
-        if (res.ok) {
+        if (res.status === 200) {
           const data = await res.json();
-          setStoryArc(data);
+          if (data && 'timeline' in data) {
+            setStoryArc(data);
+          }
+        } else if (res.status === 202) {
+          // Poll every 5 seconds if not ready
+          setTimeout(fetchArc, 5000);
         }
       } catch (e) {
         console.error("Failed to fetch story arc:", e);
@@ -148,7 +220,21 @@ export default function BriefingPage() {
         className="border-b border-mist bg-white/80 px-4 md:px-8 py-4 backdrop-blur-md shrink-0 z-20"
       >
         <div className="flex items-center justify-between">
-          <TopNav />
+          <div className="flex items-center gap-6">
+            <TopNav />
+            <button
+              onClick={toggleFollow}
+              disabled={followLoading}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                isFollowed 
+                  ? "bg-et-red text-white shadow-lg shadow-et-red/20" 
+                  : "bg-paper text-slate/40 hover:text-et-red hover:bg-white border border-mist"
+              }`}
+            >
+              <Star className={`w-3 h-3 ${isFollowed ? "fill-white" : ""}`} />
+              {isFollowed ? "Following Story" : "Follow Story"}
+            </button>
+          </div>
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] md:tracking-[0.3em] text-slate/50">
             {activePane === 'left' ? (view === 'briefing' ? 'Intelligence Brief' : 'Visual Story Arc') : 'Source Coverage'}
           </div>
@@ -160,28 +246,29 @@ export default function BriefingPage() {
         <div className={`w-full md:w-1/2 h-full overflow-y-auto border-r border-mist flex flex-col relative no-scrollbar transition-all duration-500 ${
           activePane === 'left' ? 'flex' : 'hidden md:flex'
         }`}>
-          <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md px-4 md:px-8 py-4 border-b border-mist/50 flex items-center gap-2 md:gap-4 overflow-x-auto no-scrollbar">
+          <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-mist flex overflow-hidden shrink-0">
             <button
               onClick={() => setView("briefing")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-[9px] md:text-[10px] whitespace-nowrap font-black uppercase tracking-widest transition-all ${
-                view === "briefing" ? "bg-ink text-paper shadow-lg" : "bg-paper text-slate/40 hover:text-slate"
+              className={`flex-1 flex items-center justify-center gap-2 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-r border-mist ${
+                view === "briefing" ? "bg-white text-et-red" : "bg-paper/50 text-slate/40 hover:text-slate hover:bg-paper"
               }`}
             >
-              <LayoutGrid className="w-3 h-3" />
+              <LayoutGrid className="w-3.5 h-3.5" />
               Intelligence Brief
             </button>
             <button
               onClick={() => setView("story-arc")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-[9px] md:text-[10px] whitespace-nowrap font-black uppercase tracking-widest transition-all ${
-                view === "story-arc" ? "bg-ink text-paper shadow-lg" : "bg-paper text-slate/40 hover:text-slate"
+              className={`flex-1 flex items-center justify-center gap-2 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                view === "story-arc" ? "bg-white text-et-red" : "bg-paper/50 text-slate/40 hover:text-slate hover:bg-paper"
               }`}
             >
-              <LineChart className="w-3 h-3" />
+              <LineChart className="w-3.5 h-3.5" />
               Visual Story Arc
             </button>
           </div>
 
-          <div className="p-4 md:p-8 space-y-12 flex-1">
+          <div className="flex-1 flex flex-col justify-center overflow-y-auto no-scrollbar py-6 md:py-10">
+            <div className="px-4 md:px-12 w-full max-w-4xl mx-auto">
             <AnimatePresence mode="wait">
               {briefingError ? (
                 <motion.div key="error" className="py-20 text-center text-et-red font-bold">{briefingError}</motion.div>
@@ -191,7 +278,7 @@ export default function BriefingPage() {
                   variants={container}
                   initial="hidden"
                   animate="show"
-                  className="space-y-12"
+                  className="space-y-12 my-auto mx-auto max-w-2xl w-full"
                 >
                   {view === "briefing" ? (
                     <>
@@ -240,7 +327,7 @@ export default function BriefingPage() {
                       <PremiumAd variant="banner" className="mt-12" />
                     </>
                   ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="my-auto mx-auto max-w-4xl w-full">
                       {storyArc ? (
                         <BriefingStoryArc data={storyArc} onArticleClick={(id) => {
                           const article = articles.find(a => a.id === id);
@@ -262,6 +349,7 @@ export default function BriefingPage() {
               )}
             </AnimatePresence>
           </div>
+        </div>
 
           <div className="sticky bottom-0 bg-white/90 backdrop-blur-md border-t border-mist p-4 md:p-8 z-10">
             <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,20 +1,12 @@
 import { env } from "../env";
-import { Groq } from "groq-sdk";
+import { geminiCompletion, streamGeminiCompletion } from "./gemini";
 import { withRetry } from "../utils/retry";
 
-const groqClient = new Groq({ apiKey: env.GROQ_API_KEY });
-
-// Global queue to stay under 30 RPM
+// Global queue to stay under AI limits
 let lastCallTime = 0;
-const MIN_INTERVAL_MS = 2100;
-const DISABLE_GROQ = false; // Re-enabled for News Navigator
+const MIN_INTERVAL_MS = 3000;
 
 export async function callGroq<T>(fn: () => Promise<T>) {
-  if (DISABLE_GROQ) {
-    console.log("[Groq] AI is currently disabled. Returning placeholder.");
-    return "AI-generated content is temporarily unavailable." as any;
-  }
-  
   return withRetry(async () => {
     const now = Date.now();
     const timeSinceLast = now - lastCallTime;
@@ -29,24 +21,17 @@ export async function callGroq<T>(fn: () => Promise<T>) {
   }, { retries: 5, baseDelayMs: 1000 });
 }
 
-export async function groqCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-  if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY is missing");
-  
-  const completion = await groqClient.chat.completions.create({
-    model: "llama-3.1-8b-instant",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.6,
-    max_tokens: 4096,
-    top_p: 1,
-    stream: false
-  });
+function cleanJson(text: string): string {
+  // Remove markdown code blocks if present
+  return text.replace(/```json\n?|```\n?/g, "").trim();
+}
 
-  const content = completion.choices[0]?.message?.content;
-  if (!content) throw new Error("Groq API Error: No content returned");
-  return content;
+export async function groqCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
+  // Now using Gemini only as requested
+  if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");
+  console.log("[AI] Using Gemini for completion...");
+  const content = await geminiCompletion(systemPrompt, userPrompt);
+  return cleanJson(content);
 }
 
 export async function streamGroqCompletion(
@@ -56,28 +41,9 @@ export async function streamGroqCompletion(
   onToken: (token: string) => Promise<void> | void,
   signal?: AbortSignal
 ) {
-  if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY is missing");
-
-  const messages: any[] = [
-    { role: "system", content: systemPrompt },
-    ...history,
-    { role: "user", content: userPrompt }
-  ];
-
-  const stream = await groqClient.chat.completions.create({
-    model: "llama-3.1-8b-instant",
-    messages,
-    temperature: 0.6,
-    max_tokens: 4096,
-    top_p: 1,
-    stream: true
-  }, { signal });
-
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content;
-    if (content) {
-      await onToken(content);
-    }
-  }
+  // Now using Gemini only as requested
+  if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");
+  console.log("[AI] Using Gemini for streaming...");
+  return await streamGeminiCompletion(systemPrompt, userPrompt, history, onToken, signal);
 }
 

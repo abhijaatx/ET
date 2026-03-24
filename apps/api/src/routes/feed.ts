@@ -22,14 +22,16 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
 
   if (signalCount < 5) {
     const latest = await db
-      .select()
+      .select({ article: articles })
       .from(articles)
-      .orderBy(desc(articles.publishedAt))
+      .innerJoin(stories, eq(articles.storyId, stories.id))
+      .where(eq(stories.briefingStale, false))
+      .orderBy(desc(articles.createdAt))
       .limit(limit)
       .offset(offset);
 
     const framed = await Promise.all(
-      latest.map(async (article) => ({
+      latest.map(async ({ article }) => ({
         ...article,
         frame: await getFrame({
           articleId: article.id,
@@ -82,20 +84,28 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
 
   const candidates = excludeList.length
     ? await db
-        .select()
+        .select({ article: articles })
         .from(articles)
-        .where(notInArray(articles.id, excludeList))
-        .orderBy(desc(articles.publishedAt))
+        .innerJoin(stories, eq(articles.storyId, stories.id))
+        .where(
+          and(
+            notInArray(articles.id, excludeList),
+            eq(stories.briefingStale, false)
+          )
+        )
+        .orderBy(desc(articles.createdAt))
         .limit(200)
     : await db
-        .select()
+        .select({ article: articles })
         .from(articles)
-        .orderBy(desc(articles.publishedAt))
+        .innerJoin(stories, eq(articles.storyId, stories.id))
+        .where(eq(stories.briefingStale, false))
+        .orderBy(desc(articles.createdAt))
         .limit(200);
 
   const now = new Date();
 
-  const scored = candidates.map((article) => {
+  const scored = candidates.map(({ article }) => {
     const topicScore = article.topicSlugs.reduce((sum, slug) => {
       const weight = topicMap.get(slug)?.weight ?? 0;
       return sum + weight;
@@ -107,10 +117,10 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
       return sum + weight;
     }, 0);
 
-    const daysOld = article.publishedAt
-      ? (now.getTime() - article.publishedAt.getTime()) / (1000 * 60 * 60 * 24)
+    const hoursOld = article.createdAt
+      ? (now.getTime() - article.createdAt.getTime()) / (1000 * 60 * 60)
       : 0;
-    const recencyScore = clamp(1 - daysOld / 7, 0, 1);
+    const recencyScore = clamp(1 - hoursOld / (24 * 7), 0, 1);
 
     let vectorScore = 0;
     if (userEmbedding && article.embedding) {
@@ -161,6 +171,7 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
   const articlesWithFrames = await Promise.all(
     selected.map(async ({ article }) => ({
       ...article,
+      publishedAt: article.createdAt.toISOString(), // Use ingestion time for display
       frame: await getFrame({
         articleId: article.id,
         summary: article.summary,
@@ -375,6 +386,7 @@ feedRoutes.get("/feed/trending", authMiddleware, async (c) => {
   const trendingStories = await db
     .select()
     .from(stories)
+    .where(eq(stories.briefingStale, false))
     .orderBy(desc(stories.latestArticleAt))
     .limit(15);
 

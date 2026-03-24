@@ -8,6 +8,7 @@ import { embedText } from "../services/embeddings";
 import { fetchAllArticles } from "../services/news";
 import { tagArticle } from "../services/tagging";
 import { callGroq, groqCompletion } from "../services/anthropic";
+import { enqueueStoryAI } from "../queues/story-ai";
 
 async function generateHeadline(title: string, summary: string) {
   try {
@@ -24,7 +25,7 @@ async function generateHeadline(title: string, summary: string) {
 
 export const ingestWorker = new Worker(
   "ingest",
-  async () => {
+  async (job) => {
     const rawArticles = await fetchAllArticles();
 
     for (const raw of rawArticles) {
@@ -68,7 +69,7 @@ export const ingestWorker = new Worker(
               articleCount: 0,
               topEntities: tag.entities,
               topicSlugs: tag.topicSlugs,
-              latestArticleAt: raw.publishedAt,
+              latestArticleAt: new Date(),
               briefingStale: true
             })
             .returning({ id: stories.id });
@@ -119,10 +120,13 @@ export const ingestWorker = new Worker(
             .set({
               articleIds: updatedIds,
               articleCount: updatedCount,
-              latestArticleAt: raw.publishedAt,
+              latestArticleAt: new Date(),
               briefingStale: true
             })
             .where(eq(stories.id, finalStoryId));
+
+          // Enqueue background AI processing for the story
+          await enqueueStoryAI(finalStoryId);
         }
       });
     }

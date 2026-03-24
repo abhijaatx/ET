@@ -1,24 +1,10 @@
 import { callGroq, groqCompletion } from "./anthropic";
-import fs from "fs/promises";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data", "briefings");
 
 export async function generateBriefing(params: {
   storyId: string;
   depthTier: string;
   articles: { id: string; title: string; content: string; url: string; author: string | null; publishedAt: Date | null }[];
 }) {
-  // Try to load from file-system cache first
-  const cachePath = path.join(DATA_DIR, `${params.storyId}.json`);
-  try {
-    const cached = await fs.readFile(cachePath, "utf-8");
-    console.log(`[Briefing] Serving from disk cache: ${params.storyId}`);
-    return JSON.parse(cached);
-  } catch (err) {
-    // Cache miss, proceed to generation
-  }
-
   const context = params.articles
     .map(
       (article) =>
@@ -51,15 +37,6 @@ No preamble. No markdown wrapping.`
 
     return JSON.parse(text);
   });
-
-  // Save to file-system cache
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(cachePath, JSON.stringify(briefing, null, 2), "utf-8");
-    console.log(`[Briefing] Cached to disk: ${params.storyId}`);
-  } catch (err) {
-    console.error(`[Briefing] Failed to cache to disk: ${params.storyId}`, err);
-  }
 
   return briefing;
 }

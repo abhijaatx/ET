@@ -6,6 +6,7 @@ import { fetchAllArticles } from "../services/news";
 import { tagArticle } from "../services/tagging";
 import { callGroq, groqCompletion } from "../services/anthropic";
 import { deepScrapeArticle } from "../services/scraper";
+import { enqueueStoryAI } from "../queues/story-ai";
 
 async function generateHeadline(title: string, summary: string) {
   try {
@@ -21,8 +22,11 @@ async function generateHeadline(title: string, summary: string) {
 }
 
 async function forceIngest() {
-  console.log("[Force Ingest] Starting...");
+  console.log("[Force Ingest] Starting script execution...");
+  console.log("[Force Ingest] Process PID:", process.pid);
+  console.log("[Force Ingest] Fetching articles...");
   const allRawArticles = await fetchAllArticles();
+  console.log("[Force Ingest] Fetched all articles successfully.");
   const uniqueArticlesMap = new Map();
   allRawArticles.forEach(a => uniqueArticlesMap.set(a.externalId, a));
   const rawArticles = Array.from(uniqueArticlesMap.values());
@@ -84,7 +88,7 @@ async function forceIngest() {
                 articleCount: 0,
                 topEntities: tag.entities,
                 topicSlugs: tag.topicSlugs,
-                latestArticleAt: raw.publishedAt,
+                latestArticleAt: new Date(),
                 briefingStale: true
               })
               .returning({ id: stories.id });
@@ -132,10 +136,13 @@ async function forceIngest() {
               .set({
                 articleIds: updatedIds,
                 articleCount: updatedCount,
-                latestArticleAt: raw.publishedAt,
+                latestArticleAt: new Date(),
                 briefingStale: true
               })
               .where(eq(stories.id, finalStoryId));
+
+            // Trigger background AI processing
+            await enqueueStoryAI(finalStoryId);
           }
         });
 

@@ -14,6 +14,7 @@ import notificationsRoutes from "./routes/notifications";
 import userRoutes from "./routes/user";
 import { enqueueImmediateIngest, scheduleIngest } from "./queues/ingest";
 import "./workers/ingest";
+import "./workers/story-ai";
 import type { AppEnv } from "./types/app";
 
 const app = new Hono<AppEnv>();
@@ -55,14 +56,12 @@ app.route("/api", authorRoutes);
 app.route("/api", notificationsRoutes);
 app.route("/api", userRoutes);
 
-/*
 scheduleIngest().catch((err: unknown) => {
   console.error("Failed to schedule ingest", err);
 });
 enqueueImmediateIngest().catch((err: unknown) => {
   console.error("Failed to enqueue initial ingest", err);
 });
-*/
 
 serve({
   fetch: app.fetch,
