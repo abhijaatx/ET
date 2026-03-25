@@ -41,6 +41,70 @@ export default function PreferencesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleDeleteTopic = async (slug: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/interests/topic/${slug}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (res.ok) {
+        setTopics(topics.filter(t => t.topicSlug !== slug));
+      }
+    } catch (err) {
+      console.error("Failed to delete topic", err);
+    }
+  };
+
+  const handleDeleteEntity = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/interests/entity/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (res.ok) {
+        setEntities(entities.filter(e => e.entityId !== id));
+      }
+    } catch (err) {
+      console.error("Failed to delete entity", err);
+    }
+  };
+
+  const handleAddTopic = async () => {
+    const slug = prompt("Enter topic name (e.g. business, technology, sports):");
+    if (!slug) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/interests/topic`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ topicSlug: slug.toLowerCase(), weight: 0.5 })
+      });
+      if (res.ok) {
+        // Refresh full list to be safe
+        const dataRes = await fetch(`${API_URL}/api/interests`, { credentials: "include" });
+        const data = await dataRes.json();
+        setTopics(data.topics || []);
+      }
+    } catch (err) {
+      console.error("Failed to add topic", err);
+    }
+  };
+
+  const handleRecalibrate = async () => {
+    try {
+      // Trigger a session-wide interest update (mocked as a POST to signals/recalibrate)
+      alert("Recalibrating your interest graph based on recent activity...");
+      // For now, we just refresh the data
+      const res = await fetch(`${API_URL}/api/interests`, { credentials: "include" });
+      const data = await res.json();
+      setTopics(data.topics || []);
+      setEntities(data.entities || []);
+    } catch (err) {
+      console.error("Failed to recalibrate", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-et-section flex items-center justify-center">
@@ -70,7 +134,10 @@ export default function PreferencesPage() {
                 <h2 className="text-xl font-serif font-bold text-et-headline">Topics of Interest</h2>
                 <p className="text-xs text-et-meta uppercase tracking-wider mt-1">Weighted based on your activity</p>
               </div>
-              <button className="p-2 bg-et-red text-white rounded-full hover:bg-[#B01722] transition-colors shadow-lg">
+              <button 
+                onClick={handleAddTopic}
+                className="p-2 bg-et-red text-white rounded-full hover:bg-[#B01722] transition-colors shadow-lg"
+              >
                 <PlusIcon className="w-5 h-5" />
               </button>
             </div>
@@ -93,7 +160,10 @@ export default function PreferencesPage() {
                       <div className="text-[10px] font-bold text-et-meta uppercase tracking-widest">Weight: {Math.round(topic.weight * 100)}%</div>
                     </div>
                   </div>
-                  <button className="p-2 text-et-meta hover:text-et-red transition-colors opacity-0 group-hover:opacity-100">
+                  <button 
+                    onClick={() => handleDeleteTopic(topic.topicSlug)}
+                    className="p-2 text-et-meta hover:text-et-red transition-colors opacity-0 group-hover:opacity-100"
+                  >
                     <TrashIcon className="w-4 h-4" />
                   </button>
                 </motion.div>
@@ -128,6 +198,12 @@ export default function PreferencesPage() {
                           <ChartBarIcon className="w-5 h-5 text-indigo-400" />
                           <span className="font-bold text-et-headline text-sm">{entity.entityId}</span>
                         </div>
+                        <button 
+                          onClick={() => handleDeleteEntity(entity.entityId)}
+                          className="p-2 text-et-meta hover:text-et-red opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
                         <div className="flex items-center gap-4">
                           <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div 
@@ -155,7 +231,10 @@ export default function PreferencesPage() {
                 <h3 className="text-2xl font-serif font-bold mb-3 text-white">Refine your AI Briefing</h3>
                 <p className="text-sm text-gray-300 font-medium max-w-md">The Navigator uses these signals to curate your daily digest. Recalibrate to refresh your personalized experience.</p>
               </div>
-              <button className="px-8 py-3 bg-[#E5C100] text-[#1A2B3C] rounded-xl font-bold text-sm shadow-xl shadow-[#E5C100]/20 hover:scale-105 transition-transform whitespace-nowrap">
+              <button 
+                onClick={handleRecalibrate}
+                className="px-8 py-3 bg-[#E5C100] text-[#1A2B3C] rounded-xl font-bold text-sm shadow-xl shadow-[#E5C100]/20 hover:scale-105 transition-transform whitespace-nowrap"
+              >
                 Recalibrate Feed
               </button>
             </div>

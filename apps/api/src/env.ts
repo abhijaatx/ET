@@ -2,11 +2,25 @@ import { z } from "zod";
 import * as dotenv from "dotenv";
 import { resolve } from "path";
 
-const envPath = resolve(process.cwd(), "../../.env");
-console.log(`[Env] Loading .env from: ${envPath}`);
-dotenv.config({ path: envPath });
-// Fallback to local .env if root is not found (though dev runs from root-workspace)
-dotenv.config();
+// Try to find .env in current dir, or two levels up (monorepo root)
+const possiblePaths = [
+  resolve(process.cwd(), ".env"),
+  resolve(process.cwd(), "../../.env")
+];
+
+let loaded = false;
+for (const p of possiblePaths) {
+  const result = dotenv.config({ path: p });
+  if (!result.error) {
+    console.log(`[Env] Successfully loaded .env from: ${p}`);
+    loaded = true;
+    break;
+  }
+}
+
+if (!loaded) {
+  console.warn("[Env] Could not find .env file in expected locations. Using process.env defaults.");
+}
 
 const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1),
