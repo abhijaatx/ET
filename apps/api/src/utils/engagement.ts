@@ -11,7 +11,7 @@ export function calculateEngagementScore(params: {
   saved: boolean;
   liked: boolean;
 }) {
-  const estReadTimeS = (params.wordCount / 3.5) * 60;
+  const estReadTimeS = (params.wordCount / 200) * 60;
   const ratio =
     estReadTimeS <= 0
       ? 0

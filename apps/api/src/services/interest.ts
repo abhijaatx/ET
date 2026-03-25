@@ -82,7 +82,7 @@ export async function updateInterestGraphForSession(
       const existing = topicMap.get(topicSlug);
       const oldWeight = existing?.weight ?? 0;
       const updatedWeight =
-        engagement < 0.1 ? oldWeight * 0.8 : oldWeight * 0.85 + engagement * 0.15;
+        engagement < 0.1 ? oldWeight * 0.8 : oldWeight * 0.7 + engagement * 0.3;
       const lastEngaged = existing?.lastEngagedAt ?? now;
       const daysInactive = daysBetween(now, lastEngaged);
       const decayFactor = Math.pow(0.5, daysInactive / 14);
@@ -240,7 +240,7 @@ export async function updateInterestGraphForSignal(params: {
     const updatedWeight =
       params.engagementScore < 0.1
         ? oldWeight * 0.8
-        : oldWeight * 0.85 + params.engagementScore * 0.15;
+        : oldWeight * 0.7 + params.engagementScore * 0.3;
     const lastEngaged = current?.lastEngagedAt ?? now;
     const daysInactive = daysBetween(now, lastEngaged);
     const decayFactor = Math.pow(0.5, daysInactive / 14);
