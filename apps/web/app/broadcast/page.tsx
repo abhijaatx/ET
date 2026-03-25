@@ -29,6 +29,7 @@ export default function BroadcastPage() {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(true);
   const [progress, setProgress] = useState(0);
   const [playbackKey, setPlaybackKey] = useState(0);
   const expectedIndexRef = useRef(-1);
@@ -75,13 +76,16 @@ export default function BroadcastPage() {
   useEffect(() => {
     if (bgMusicRef.current) {
         bgMusicRef.current.volume = 0.4;
-        if (isPlaying && !loading) {
-            bgMusicRef.current.play().catch(e => console.warn("Music playback blocked by browser policy", e));
+        if (isPlaying && !loading && musicEnabled) {
+            bgMusicRef.current.play().catch(e => {
+                console.warn("Music playback failed", e);
+                // If it fails on first move, it's usually browser policy
+            });
         } else {
             bgMusicRef.current.pause();
         }
     }
-  }, [isPlaying, loading]);
+  }, [isPlaying, loading, musicEnabled]);
 
   const speak = useCallback((text: string, onEnd: () => void) => {
     if (typeof window === "undefined" || !window.speechSynthesis) {
@@ -187,7 +191,7 @@ export default function BroadcastPage() {
     <div className="h-screen bg-et-section overflow-hidden flex flex-col relative text-et-headline font-sans">
       <audio 
         ref={bgMusicRef}
-        src="https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3"
+        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
         loop
       />
       <div className="z-50 bg-white border-b border-et-border px-4 md:px-8 py-2 md:py-3 flex items-center justify-between shadow-sm">
@@ -366,6 +370,13 @@ export default function BroadcastPage() {
                 </div>
 
                 <div className="flex gap-2">
+                    <button 
+                        onClick={() => setMusicEnabled(!musicEnabled)}
+                        className={`p-3 md:p-4 rounded-xl border transition-all ${musicEnabled ? 'border-et-red text-et-red bg-et-red/5' : 'border-et-border text-et-secondary hover:border-et-red/50 hover:text-et-red/50'}`}
+                        title={musicEnabled ? "Disable Music" : "Enable Music"}
+                    >
+                        <SpeakerWaveIcon className={`w-4 h-4 md:w-5 md:h-5 ${musicEnabled ? 'animate-pulse' : ''}`} />
+                    </button>
                     <button 
                         onClick={() => {
                             setCurrentIndex(0);
