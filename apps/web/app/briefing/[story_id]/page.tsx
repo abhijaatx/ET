@@ -245,6 +245,32 @@ export default function BriefingPage() {
       api: `/api/briefing/${storyId}/ask`,
     });
 
+  // Focus Time Tracking (Heartbeat)
+  useEffect(() => {
+    if (!storyId) return;
+
+    const interval = setInterval(() => {
+      const targetArticleId = sourceId || briefing?.source_articles?.[0]?.id || articles?.[0]?.id;
+
+      if (targetArticleId && document.visibilityState === "visible") {
+        const url = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+        fetch(`${url}/api/signals`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            article_id: targetArticleId,
+            time_spent_s: 30,
+            scroll_depth: 0.5,
+            opened_briefing: true
+          })
+        }).catch(err => console.error("Focus heartbeat failed:", err));
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [storyId, sourceId, briefing, articles]);
+
   return (
     <div className="h-screen flex flex-col bg-paper overflow-hidden font-display">
       <motion.header 
