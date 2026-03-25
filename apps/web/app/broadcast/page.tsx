@@ -104,9 +104,13 @@ export default function BroadcastPage() {
         setCurrentIndex(prev => prev + 1);
         setProgress(0);
     } else {
-        setIsPlaying(false);
+        // Continuous Live Feed: Restart and re-fetch
+        console.log("[Broadcast] Restarting continuous feed...");
+        setCurrentIndex(0);
+        setProgress(0);
+        fetchBroadcast(); // Re-fetch to get any new articles ingested in the meantime
     }
-  }, [currentIndex, scenes.length]);
+  }, [currentIndex, scenes.length, fetchBroadcast]);
 
   useEffect(() => {
     if (!isPlaying || currentIndex < 0 || currentIndex >= scenes.length) {
@@ -165,7 +169,7 @@ export default function BroadcastPage() {
         <div className="flex items-center gap-2 md:gap-3">
             <div className="flex items-center gap-2 px-2 py-0.5 md:py-1 bg-et-red rounded text-white shadow-sm">
                 <SignalIcon className="w-2.5 h-2.5 md:w-3 h-3 animate-pulse" />
-                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em]">LIVE AI</span>
+                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em]">CONTINUOUS LIVE AI</span>
             </div>
             <h1 className="text-base md:text-lg font-serif font-black tracking-tighter italic">Broadcaster</h1>
         </div>

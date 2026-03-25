@@ -360,6 +360,12 @@ export default function BriefingPage() {
                       <div className="space-y-12">
                         {/* Headline Section */}
                         <motion.section variants={item}>
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-6 h-px bg-et-red opacity-30" />
+                            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate/40">
+                              {briefing?.generated_at ? new Date(briefing.generated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase() : 'TODAY'}
+                            </span>
+                          </div>
                           <h1 className="text-3xl md:text-5xl font-black leading-[1.1] text-ink mb-10 decoration-et-red/10 animate-fade-in pr-4">
                             {isTranslating ? (
                               <span className="flex items-center gap-3 italic text-slate/30 text-2xl md:text-3xl animate-pulse">

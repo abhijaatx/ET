@@ -1,13 +1,16 @@
 import { db } from "../db";
 import { articles, stories, globalBroadcasts } from "@myet/db";
-import { and, desc, isNotNull, not, eq, inArray } from "drizzle-orm";
+import { and, desc, isNotNull, not, eq, inArray, sql } from "drizzle-orm";
 import { groqCompletion } from "./anthropic";
 
 export async function refreshGlobalBroadcast() {
   console.log("[Broadcast] Refreshing global cache with deep intelligence...");
   try {
-    // 1. Fetch top 8 stories that have an AI-generated briefing
-    const topStories = await db
+    // 1. Fetch top stories that have an AI-generated briefing, focused on TODAY
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+
+    let topStories = await db
       .select({
         id: stories.id,
         headline: stories.headline,
@@ -17,11 +20,34 @@ export async function refreshGlobalBroadcast() {
       .from(stories)
       .where(
         and(
-          isNotNull(stories.briefingCache)
+          isNotNull(stories.briefingCache),
+          sql`${stories.latestArticleAt} >= ${todayMidnight}`
         )
       )
       .orderBy(desc(stories.latestArticleAt))
-      .limit(8);
+      .limit(15);
+
+    // Fallback if no stories today yet
+    if (topStories.length < 3) {
+      console.log("[Broadcast] Low volume today, falling back to last 24h");
+      const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      topStories = await db
+        .select({
+          id: stories.id,
+          headline: stories.headline,
+          briefing: stories.briefingCache,
+          articleIds: stories.articleIds
+        })
+        .from(stories)
+        .where(
+          and(
+            isNotNull(stories.briefingCache),
+            sql`${stories.latestArticleAt} >= ${last24h}`
+          )
+        )
+        .orderBy(desc(stories.latestArticleAt))
+        .limit(15);
+    }
 
     if (topStories.length === 0) {
       console.warn("[Broadcast] No stories with briefings found.");

@@ -53,7 +53,9 @@ export const stories = pgTable("stories", {
   vernacularCache: jsonb("vernacular_cache").notNull().default({}),
   latestArticleAt: timestamp("latest_article_at"),
   createdAt: timestamp("created_at").notNull().defaultNow()
-});
+}, (table) => ({
+  latestArticleIdx: uniqueIndex("stories_latest_article_idx").on(table.latestArticleAt)
+}));
 
 export const articles = pgTable(
   "articles",
@@ -77,7 +79,8 @@ export const articles = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow()
   },
   (table) => ({
-    externalIdIdx: uniqueIndex("articles_external_id_unique").on(table.externalId)
+    externalIdIdx: uniqueIndex("articles_external_id_unique").on(table.externalId),
+    createdAtIdx: uniqueIndex("articles_created_at_idx").on(table.createdAt)
   })
 );
 
