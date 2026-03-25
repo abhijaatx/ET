@@ -6,10 +6,10 @@ const groq = new Groq({
   apiKey: env.GROQ_API_KEY
 });
 
-// Global queue to stay under AI limits (50 RPM = 1200ms per call)
+// Global queue to stay under AI limits (5 RPM = 12000ms per call)
 let lastCallTime = 0;
 let pauseUntil = 0;
-const MIN_INTERVAL_MS = 1200;
+const MIN_INTERVAL_MS = 12000;
 
 export async function callGroq<T>(fn: () => Promise<T>) {
   return withRetry(async () => {
@@ -48,33 +48,34 @@ export async function groqCompletion(systemPrompt: string, userPrompt: string): 
   
   let lastError: any = null;
 
-  for (const model of MODELS) {
-    try {
-      console.log(`[AI] Using Groq (${model}) for completion...`);
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        model: model,
-        temperature: 0.5,
-        max_tokens: 4096,
-      });
+  return await callGroq(async () => {
+    for (const model of MODELS) {
+      try {
+        console.log(`[AI] Using Groq (${model}) for completion...`);
+        const chatCompletion = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          model: model,
+          temperature: 0.5,
+          max_tokens: 4096,
+        });
 
-      return cleanJson(chatCompletion.choices[0]?.message?.content || "");
-    } catch (error: any) {
-      lastError = error;
-      // If it's a rate limit error (429), try the next model
-      if (error?.status === 429) {
-        console.warn(`[AI] Model ${model} rate limited (429). Pausing for 2 mins...`);
-        pauseUntil = Date.now() + 120 * 1000;
-        continue;
+        return cleanJson(chatCompletion.choices[0]?.message?.content || "");
+      } catch (error: any) {
+        lastError = error;
+        // If it's a rate limit error (429), try the next model and set a longer cooldown
+        if (error?.status === 429) {
+          console.warn(`[AI] Model ${model} rate limited (429). Pausing for 2 mins...`);
+          pauseUntil = Date.now() + 120 * 1000;
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
-  }
-  
-  throw lastError;
+    throw lastError;
+  });
 }
 
 export async function streamGroqCompletion(
@@ -95,41 +96,42 @@ export async function streamGroqCompletion(
 
   let lastError: any = null;
 
-  for (const model of MODELS) {
-    try {
-      console.log(`[AI] Using Groq (${model}) for streaming...`);
+  return await callGroq(async () => {
+    for (const model of MODELS) {
+      try {
+        console.log(`[AI] Using Groq (${model}) for streaming...`);
 
-      const stream = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...history.map(h => ({ role: h.role, content: h.content })),
-          { role: "user", content: userPrompt }
-        ],
-        model: model,
-        temperature: 0.5,
-        max_tokens: 4096,
-        stream: true,
-      });
+        const stream = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...history.map(h => ({ role: h.role, content: h.content })),
+            { role: "user", content: userPrompt }
+          ],
+          model: model,
+          temperature: 0.5,
+          max_tokens: 4096,
+          stream: true,
+        });
 
-      for await (const chunk of stream) {
-        if (signal?.aborted) break;
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          await onToken(content);
+        for await (const chunk of stream) {
+          if (signal?.aborted) break;
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            await onToken(content);
+          }
         }
+        return; // Success
+      } catch (error: any) {
+        lastError = error;
+        if (error?.status === 429) {
+          console.warn(`[AI] Model ${model} rate limited (429) during stream. Pausing for 2 mins...`);
+          pauseUntil = Date.now() + 120 * 1000;
+          continue;
+        }
+        throw error;
       }
-      return; // Success
-    } catch (error: any) {
-      lastError = error;
-      if (error?.status === 429) {
-        console.warn(`[AI] Model ${model} rate limited (429) during stream. Pausing for 2 mins...`);
-        pauseUntil = Date.now() + 120 * 1000;
-        continue;
-      }
-      throw error;
     }
-  }
-
-  throw lastError;
+    throw lastError;
+  });
 }
 
