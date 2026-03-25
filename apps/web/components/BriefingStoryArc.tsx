@@ -15,9 +15,9 @@ import {
 
 export type StoryArcData = {
   story_id: string;
-  timeline: { date: string; event: string; article_id: string; impact_level: "low" | "medium" | "high" }[];
+  timeline: { date: string; event: string; article_id: string; impact_level: "low" | "medium" | "high"; author?: string }[];
   players: { name: string; role: string; stance: string; influence_score: number }[];
-  contrarian_views: { perspective: string; source_article_id: string; strength: "moderate" | "significant" }[];
+  contrarian_views: { perspective: string; source_article_id: string; strength: "moderate" | "significant"; author?: string }[];
   predictions: { scenario: string; probability: string; trigger: string }[];
 };
 
@@ -59,7 +59,7 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
           </div>
         </div>
         
-        <div className="relative pl-8 md:pl-10 space-y-6 before:content-[''] before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-red-200 before:via-orange-100 before:to-slate-100">
+        <div className="relative pl-10 space-y-6 before:content-[''] before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-red-200 before:via-orange-100 before:to-slate-100">
           {data.timeline.map((item, idx) => (
             <motion.div 
               key={idx}
@@ -67,7 +67,7 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
               className="relative group cursor-pointer"
               onClick={() => onArticleClick?.(item.article_id)}
             >
-              <div className={`absolute -left-[32px] top-1 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center transition-all duration-500 z-10 ${
+              <div className={`absolute -left-[30px] top-1 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center transition-all duration-500 z-10 ${
                 item.impact_level === 'high' ? 'border-red-600 scale-110 shadow-md' : 'border-slate-300 group-hover:border-red-400'
               }`}>
                 {item.impact_level === 'high' ? <Star className="w-2.5 h-2.5 text-red-600 fill-red-600" /> : <div className="w-1 h-1 rounded-full bg-slate-300 group-hover:bg-red-400" />}
@@ -78,8 +78,9 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
                   ? 'bg-gradient-to-br from-white to-red-50/10 border-red-100 shadow-sm' 
                   : 'bg-white border-slate-100 hover:border-red-200 hover:shadow-sm'
               }`}>
-                <div className="text-[9px] font-black text-red-500/60 uppercase tracking-widest mb-2" >
-                  {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                <div className="text-[9px] font-black text-red-500/60 uppercase tracking-widest mb-2 flex items-center justify-between" >
+                  <span>{new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  {item.author && <span className="opacity-40 italic">BY {item.author}</span>}
                 </div>
                 <p className={`text-base md:text-lg leading-snug ${item.impact_level === 'high' ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>
                   {item.event}
@@ -158,6 +159,7 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
                   <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-red-600" />
                     <span className="text-[9px] font-black uppercase tracking-widest text-red-600">Minority Report</span>
+                    {c.author && <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 opacity-60 ml-2">BY {c.author}</span>}
                   </div>
                   <button 
                     onClick={() => onArticleClick?.(c.source_article_id)}

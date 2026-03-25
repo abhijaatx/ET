@@ -1,27 +1,22 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Manually parse .env to avoid import issues
+const envFile = fs.readFileSync(path.join(process.cwd(), "../../.env"), "utf-8");
+const apiKeyLine = envFile.split("\n").find(line => line.startsWith("GEMINI_API_KEY="));
+const apiKey = apiKeyLine ? apiKeyLine.split("=")[1].trim() : "";
 
-dotenv.config({ path: path.join(__dirname, "../../../.env") });
+const genAI = new GoogleGenerativeAI(apiKey);
 
 async function listModels() {
-  const apiKey = "AIzaSyAUyCks_YyxPxvFjLzaZ5jd_EbPWJQt1vI"; // Hardcoded for diagnostic
-  console.log("Using API Key:", apiKey.slice(0, 10), "...");
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    const data = await response.json();
-    console.log("Full Response:", JSON.stringify(data, null, 2));
-    if (data.models) {
-      console.log("Available Models:", JSON.stringify(data.models.map((m: any) => m.name), null, 2));
-    } else {
-      console.error("No models found in response.");
+    const result = await genAI.listModels();
+    for (const m of result.models) {
+      console.log(`${m.name} - ${m.supportedGenerationMethods}`);
     }
-  } catch (err) {
-    console.error("Failed to list models:", err);
+  } catch (e) {
+    console.error(e);
   }
 }
 

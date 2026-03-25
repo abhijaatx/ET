@@ -9,6 +9,7 @@ import { fetchAllArticles } from "../services/news";
 import { tagArticle } from "../services/tagging";
 import { callGroq, groqCompletion } from "../services/anthropic";
 import { enqueueStoryAI } from "../queues/story-ai";
+import { deepScrapeArticle } from "../services/scraper";
 
 async function generateHeadline(title: string, summary: string) {
   try {
@@ -26,7 +27,8 @@ async function generateHeadline(title: string, summary: string) {
 export const ingestWorker = new Worker(
   "ingest",
   async (job) => {
-    const rawArticles = await fetchAllArticles();
+    const rawArticles = (await fetchAllArticles()).filter(a => a.imageUrl && a.imageUrl.startsWith("http"));
+    console.log(`[ingest] Fetched ${rawArticles.length} articles with images`);
 
     for (const raw of rawArticles) {
       const embedding = await embedText(`${raw.title}\n${raw.content}`);
@@ -46,6 +48,16 @@ export const ingestWorker = new Worker(
       const headline = storyId
         ? null
         : await generateHeadline(raw.title, tag.summary);
+
+      // Deep scrape for full content if the initial snippet is too short
+      let fullContent = raw.content;
+      if (!fullContent || fullContent.length < 300) {
+        console.log(`[ingest] Deep scraping for: ${raw.title}`);
+        const scraped = await deepScrapeArticle(raw.url, raw.source);
+        if (scraped && scraped.length > fullContent.length) {
+          fullContent = scraped;
+        }
+      }
 
       // Add a small delay to avoid hitting Groq's rate limit during batch processing
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -82,7 +94,7 @@ export const ingestWorker = new Worker(
           .values({
             externalId: raw.externalId,
             title: raw.title,
-            content: raw.content,
+            content: fullContent,
             summary: tag.summary,
             url: raw.url,
             source: raw.source,

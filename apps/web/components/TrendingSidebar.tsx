@@ -58,7 +58,7 @@ export function TrendingSidebar() {
   };
 
   return (
-    <div className="py-6 space-y-6 sticky top-0 h-screen overflow-y-auto hidden lg:block px-4">
+    <div className="py-6 space-y-6">
       <div className="sticky top-0 bg-et-section/95 backdrop-blur-md pb-4 z-10 space-y-4">
         <div className="relative group">
           <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-et-meta transition-colors group-focus-within:text-et-red" />

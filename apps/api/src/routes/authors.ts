@@ -115,7 +115,7 @@ routes.post("/authors/:id/unfollow", authMiddleware, async (c) => {
         .set({
           followersCount: sql`GREATEST(${authors.followersCount} - 1, 0)`
         })
-        .where(eq(authors.id, authorId));
+        .where(eq(authors.id, authorId as string));
     }
 
     return c.json({ success: true, isFollowing: false });

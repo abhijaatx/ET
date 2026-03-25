@@ -5,10 +5,11 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useChat } from "ai/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopNav } from "../../../components/TopNav";
+import { LanguageSelector } from "../../../components/LanguageSelector";
 import { useAuthorProfile } from "../../../context/AuthorProfileContext";
 import { PremiumAd } from "../../../components/PremiumAd";
 import { BriefingStoryArc, type StoryArcData } from "../../../components/BriefingStoryArc";
-import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star } from "lucide-react";
+import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star, Globe, X } from "lucide-react";
 
 const STOCK_PHOTO = "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
 
@@ -71,6 +72,35 @@ export default function BriefingPage() {
   const [activeSource, setActiveSource] = useState<ArticleItem | null>(null);
   const [isFollowed, setIsFollowed] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [vernacularBriefing, setVernacularBriefing] = useState<BriefingDocument | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  useEffect(() => {
+    if (currentLanguage === "en") {
+      setVernacularBriefing(null);
+      return;
+    }
+
+    const fetchVernacular = async () => {
+      setIsTranslating(true);
+      try {
+        const res = await fetch(`/api/briefing/${storyId}/vernacular/${currentLanguage}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setVernacularBriefing(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch vernacular:", e);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    fetchVernacular();
+  }, [storyId, currentLanguage]);
 
   useEffect(() => {
     const fetchFollowStatus = async () => {
@@ -223,6 +253,14 @@ export default function BriefingPage() {
           <div className="flex items-center gap-6">
             <TopNav />
             <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="p-2 rounded-full hover:bg-mist/10 transition-all text-slate/40 hover:text-et-red group relative"
+              title="Change Language"
+            >
+              <Globe className="w-5 h-5" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-et-red rounded-full border-2 border-white" />
+            </button>
+            <button
               onClick={toggleFollow}
               disabled={followLoading}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
@@ -267,89 +305,115 @@ export default function BriefingPage() {
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col justify-center overflow-y-auto no-scrollbar py-6 md:py-10">
+          <div className="flex-1 flex flex-col justify-start overflow-y-auto no-scrollbar py-6 md:py-10">
             <div className="px-4 md:px-12 w-full max-w-4xl mx-auto">
-            <AnimatePresence mode="wait">
-              {briefingError ? (
-                <motion.div key="error" className="py-20 text-center text-et-red font-bold">{briefingError}</motion.div>
-              ) : briefing ? (
-                <motion.div 
-                  key="briefing-container"
-                  variants={container}
-                  initial="hidden"
-                  animate="show"
-                  className="space-y-12 my-auto mx-auto max-w-2xl w-full"
-                >
-                  {view === "briefing" ? (
-                    <>
-                      {(briefing.executive_summary || briefing.summary?.text) && (
-                        <motion.section variants={item} className="relative">
-                          <div className="absolute -left-4 md:-left-8 top-0 bottom-0 w-1 bg-et-red opacity-20 rounded-full" />
-                          <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-et-red px-2 mb-4">The Bottom Line</h2>
-                          <p className="text-xl md:text-2xl font-serif font-bold leading-relaxed text-ink">
-                            {briefing.executive_summary || briefing.summary?.text}
-                          </p>
+              <AnimatePresence mode="wait">
+                {briefingError ? (
+                  <motion.div key="error" className="py-20 text-center text-et-red font-bold">{briefingError}</motion.div>
+                ) : briefing ? (
+                  <motion.div 
+                    key="briefing-container"
+                    variants={container}
+                    initial="hidden"
+                    animate="show"
+                    className="space-y-12 my-auto mx-auto max-w-2xl w-full"
+                  >
+                    {view === "briefing" ? (
+                      <div className="space-y-12">
+                        {/* Headline Section */}
+                        <motion.section variants={item}>
+                          <h1 className="text-3xl md:text-5xl font-black leading-[1.1] text-ink mb-10 decoration-et-red/10 animate-fade-in pr-4">
+                            {isTranslating ? (
+                              <span className="flex items-center gap-3 italic text-slate/30 text-2xl md:text-3xl animate-pulse">
+                                Adapting to {currentLanguage === 'hi' ? 'Hindi' : currentLanguage === 'ta' ? 'Tamil' : currentLanguage === 'te' ? 'Telugu' : 'Bengali'}...
+                              </span>
+                            ) : (
+                              (vernacularBriefing || briefing)?.headline
+                            )}
+                          </h1>
                         </motion.section>
-                      )}
 
-                      <section className="space-y-6">
-                        <motion.h2 variants={item} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40 px-2">Analysis Sections</motion.h2>
-                        <div className="grid gap-4">
-                          {briefing.sections.map((section) => (
-                            <motion.details
-                              variants={item}
-                              key={section.id}
-                              className="rounded-3xl md:rounded-[2.5rem] border border-mist bg-white/40 hover:bg-white p-6 md:p-8 shadow-soft transition-all group overflow-hidden"
-                            >
-                              <summary className="cursor-pointer font-display text-xl md:text-2xl capitalize hover:text-et-red list-none flex items-center justify-between">
-                                <span>{section.title.replace(/-/g, " ")}</span>
-                                <span className="w-8 h-8 rounded-full bg-mist/20 flex items-center justify-center group-open:rotate-180 transition-transform">
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                </span>
-                              </summary>
-                              <div className="mt-6 text-base md:text-lg font-serif leading-relaxed text-ink/80">{section.content}</div>
-                            </motion.details>
-                          ))}
-                        </div>
-                      </section>
+                        {/* Executive Summary Section */}
+                        {(vernacularBriefing || briefing)?.executive_summary && (
+                          <motion.section variants={item} className="relative">
+                            <div className="absolute -left-4 md:-left-8 top-0 bottom-0 w-1 bg-et-red opacity-20 rounded-full" />
+                            <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-et-red px-2 mb-4">Executive Intel</h2>
+                            <p className="text-xl md:text-2xl font-serif font-bold leading-relaxed text-ink italic">
+                              {isTranslating ? '...' : (vernacularBriefing || briefing)?.executive_summary}
+                            </p>
+                          </motion.section>
+                        )}
 
-                      <section className="space-y-6 pt-12 border-t border-mist/50">
-                        <motion.h2 variants={item} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40 px-2">AI Correspondent</motion.h2>
-                        <div className="space-y-4">
-                          {messages.map((m) => (
-                            <div key={m.id} className={`rounded-[2rem] px-6 md:px-8 py-6 text-sm ${m.role === "assistant" ? "bg-white shadow-soft border border-mist/30" : "bg-ink text-paper ml-4 md:ml-8"}`}>
-                              <div className="whitespace-pre-wrap leading-relaxed text-base">{m.content}</div>
-                            </div>
-                          ))}
-                          {isLoading && <div className="text-[10px] font-bold uppercase tracking-widest text-slate/40 px-8">Synthesizing...</div>}
-                        </div>
-                      </section>
-                      <PremiumAd variant="banner" className="mt-12" />
-                    </>
-                  ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="my-auto mx-auto max-w-4xl w-full">
-                      {storyArc ? (
-                        <BriefingStoryArc data={storyArc} onArticleClick={(id) => {
-                          const article = articles.find(a => a.id === id);
-                          if (article) {
-                            setActiveSource(article);
-                            setActivePane("right");
-                          }
-                        }} />
-                      ) : arcLoading ? (
-                        <div className="py-20 text-center animate-pulse text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40">Analyzing History...</div>
-                      ) : (
-                        <div className="py-20 text-center text-slate/40">Story Arc analysis unavailable for this story.</div>
-                      )}
-                    </motion.div>
-                  )}
-                </motion.div>
-              ) : (
-                <div className="py-20 text-center animate-pulse font-bold text-slate/20">LOADING BRIEFING...</div>
-              )}
-            </AnimatePresence>
+                        {/* Analysis Sections */}
+                        <section className="space-y-6">
+                          <motion.h2 variants={item} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40 px-2">Analysis Sections</motion.h2>
+                          <div className="grid gap-4">
+                            {(vernacularBriefing || briefing)?.sections.map((section) => (
+                              <motion.details
+                                variants={item}
+                                key={section.id}
+                                className="rounded-3xl md:rounded-[2.5rem] border border-mist bg-white/40 hover:bg-white p-6 md:p-8 shadow-soft transition-all group overflow-hidden"
+                              >
+                                <summary className="cursor-pointer font-display text-xl md:text-2xl capitalize hover:text-et-red list-none flex items-center justify-between">
+                                  <span>{section.title.replace(/-/g, " ")}</span>
+                                  <span className="w-8 h-8 rounded-full bg-mist/20 flex items-center justify-center group-open:rotate-180 transition-transform">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                  </span>
+                                </summary>
+                                <div className="mt-6 text-base md:text-lg font-serif leading-relaxed text-ink/80">{section.content}</div>
+                              </motion.details>
+                            ))}
+                          </div>
+                        </section>
+
+                        {/* Chat History Section */}
+                        <section className="space-y-6 pt-12 border-t border-mist/50">
+                          <motion.h2 variants={item} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40 px-2">AI Correspondent</motion.h2>
+                          <div className="space-y-4">
+                            {messages.map((m) => (
+                              <div key={m.id} className={`rounded-[2rem] px-6 md:px-8 py-6 text-sm ${m.role === "assistant" ? "bg-white shadow-soft border border-mist/30" : "bg-ink text-paper ml-4 md:ml-8"}`}>
+                                <div className="whitespace-pre-wrap leading-relaxed text-base">{m.content}</div>
+                              </div>
+                            ))}
+                            {isLoading && <div className="text-[10px] font-bold uppercase tracking-widest text-slate/40 px-8">Synthesizing...</div>}
+                          </div>
+                        </section>
+                        <PremiumAd variant="banner" className="mt-12" />
+                      </div>
+                    ) : (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="my-auto mx-auto max-w-4xl w-full">
+                        {storyArc ? (
+                          <BriefingStoryArc data={{
+                            ...storyArc,
+                            timeline: storyArc.timeline.map(item => ({
+                              ...item,
+                              author: articles.find(a => a.id === item.article_id)?.author || undefined
+                            })),
+                            contrarian_views: storyArc.contrarian_views.map(item => ({
+                              ...item,
+                              author: articles.find(a => a.id === item.source_article_id)?.author || undefined
+                            }))
+                          }} onArticleClick={(id) => {
+                            const article = articles.find(a => a.id === id);
+                            if (article) {
+                              setActiveSource(article);
+                              setActivePane("right");
+                            }
+                          }} />
+                        ) : arcLoading ? (
+                          <div className="py-20 text-center animate-pulse text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40">Analyzing History...</div>
+                        ) : (
+                          <div className="py-20 text-center text-slate/40">Story Arc analysis unavailable for this story.</div>
+                        )}
+                      </motion.div>
+                    )}
+                  </motion.div>
+                ) : (
+                  <div className="py-20 text-center animate-pulse font-bold text-slate/20">LOADING BRIEFING...</div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
 
           <div className="sticky bottom-0 bg-white/90 backdrop-blur-md border-t border-mist p-4 md:p-8 z-10">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -371,6 +435,9 @@ export default function BriefingPage() {
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-et-red">Primary Source</span>
                   <h2 className="text-2xl md:text-3xl font-display leading-tight">{activeSource.title}</h2>
+                  {activeSource.author && (
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-ink/40 mt-1">BY {activeSource.author}</p>
+                  )}
                 </div>
                 <button onClick={() => setActiveSource(null)} className="w-10 h-10 shrink-0 rounded-full bg-white border border-mist flex items-center justify-center hover:bg-et-red hover:text-white transition-all">✕</button>
               </div>
@@ -384,6 +451,20 @@ export default function BriefingPage() {
           ) : (
             <div className="space-y-6">
               <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-slate/30 text-center">Reference Coverage</p>
+              {(vernacularBriefing || briefing)?.suggested_questions && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(vernacularBriefing || briefing)?.suggested_questions.map((q, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => setInput(q)}
+                      className="p-4 rounded-xl border border-mist hover:border-et-red hover:bg-et-red/5 text-left text-sm font-bold transition-all group"
+                    >
+                      <span className="opacity-40 mr-2 group-hover:text-et-red">0{i+1}</span>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="grid gap-3">
                 {articles.map((a) => (
                   <button key={a.id} onClick={() => setActiveSource(a)} className="w-full text-left p-6 rounded-3xl border border-mist bg-white/60 hover:bg-white hover:shadow-soft transition-all group">
@@ -419,6 +500,60 @@ export default function BriefingPage() {
           </button>
         </div>
       </div>
+
+      {/* Language Drawer */}
+      <AnimatePresence>
+        {isDrawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDrawerOpen(false)}
+              className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-40"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-full md:w-80 bg-white shadow-2xl z-50 p-8 flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-12">
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40">Select Language</h2>
+                <button 
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="p-2 rounded-full hover:bg-mist/20 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="flex-1 space-y-8">
+                <div className="p-6 rounded-[2rem] bg-paper border border-mist/50">
+                  <p className="text-sm font-serif leading-relaxed text-ink/60 mb-6 italic">
+                    Experience real-time, culturally adapted business intelligence in your preferred vernacular.
+                  </p>
+                  <LanguageSelector 
+                    currentLanguage={currentLanguage}
+                    onLanguageChange={(lang) => {
+                      setCurrentLanguage(lang);
+                      setIsDrawerOpen(false);
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-auto pt-8 border-t border-mist/30">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-slate/30 text-center leading-relaxed">
+                  Powered by Google Gemini<br/>
+                  Vernacular Engine v2.0
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

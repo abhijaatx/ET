@@ -9,13 +9,15 @@ import {
   EnvelopeIcon, 
   BookmarkIcon, 
   UserIcon,
-  HeartIcon
+  HeartIcon,
+  VideoCameraIcon
 } from "@heroicons/react/24/outline";
-import { HomeIcon as HomeIconSolid } from "@heroicons/react/24/solid";
+import { HomeIcon as HomeIconSolid, VideoCameraIcon as VideoCameraIconSolid } from "@heroicons/react/24/solid";
 
 const navItems = [
   { name: "Home", href: "/", icon: HomeIcon, activeIcon: HomeIconSolid },
   { name: "Explore", href: "/explore", icon: HashtagIcon },
+  { name: "AI Broadcast", href: "/broadcast", icon: VideoCameraIcon, activeIcon: VideoCameraIconSolid },
   { name: "Notifications", href: "/notifications", icon: BellIcon },
   { name: "Liked Posts", href: "/liked", icon: HeartIcon },
   { name: "Bookmarks", href: "/bookmarks", icon: BookmarkIcon },

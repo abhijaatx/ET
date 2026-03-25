@@ -50,6 +50,7 @@ export const stories = pgTable("stories", {
   briefingStale: boolean("briefing_stale").notNull().default(true),
   storyArcCache: jsonb("story_arc_cache"),
   storyArcStale: boolean("story_arc_stale").notNull().default(true),
+  vernacularCache: jsonb("vernacular_cache").notNull().default({}),
   latestArticleAt: timestamp("latest_article_at"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });

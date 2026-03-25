@@ -45,7 +45,7 @@ export function PremiumAd({
     return (
       <motion.div 
         whileHover={{ y: -4 }}
-        className={`bg-white rounded-[2.5rem] overflow-hidden border border-et-border shadow-xl ${className}`}
+        className={`bg-white rounded-3xl overflow-hidden border border-et-border shadow-md ${className}`}
       >
         <div className="h-48 overflow-hidden relative">
           <img src={displayImage} alt="Ad" className="w-full h-full object-cover" />

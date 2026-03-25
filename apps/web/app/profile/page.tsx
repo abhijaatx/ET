@@ -219,12 +219,14 @@ export default function ProfilePage() {
                <h3 className="text-lg font-serif font-bold text-et-headline px-2">Followed Authors</h3>
                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 px-1">
                  {data.followedAuthors.map(author => (
-                   <div key={author.id} className="min-w-[120px] bg-white rounded-2xl p-4 border border-et-divider text-center shadow-sm">
-                     <div className="w-16 h-16 rounded-full bg-et-section mx-auto mb-3 overflow-hidden border-2 border-white">
-                        {author.avatarUrl ? <img src={author.avatarUrl} alt={author.name} className="w-full h-full object-cover" /> : <UserCircleIcon className="w-full h-full text-et-divider" />}
+                   <Link key={author.id} href="/profile/authors">
+                     <div className="min-w-[120px] bg-white rounded-2xl p-4 border border-et-divider text-center shadow-sm hover:shadow-md hover:border-et-red/20 transition-all cursor-pointer group">
+                       <div className="w-16 h-16 rounded-full bg-et-section mx-auto mb-3 overflow-hidden border-2 border-white group-hover:scale-105 transition-transform">
+                          {author.avatarUrl ? <img src={author.avatarUrl} alt={author.name} className="w-full h-full object-cover" /> : <UserCircleIcon className="w-full h-full text-et-divider" />}
+                       </div>
+                       <div className="text-[11px] font-bold truncate group-hover:text-et-red transition-colors">{author.name}</div>
                      </div>
-                     <div className="text-[11px] font-bold truncate">{author.name}</div>
-                   </div>
+                   </Link>
                  ))}
                </div>
              </div>
@@ -232,10 +234,12 @@ export default function ProfilePage() {
                <h3 className="text-lg font-serif font-bold text-et-headline px-2">Followed Stories</h3>
                <div className="space-y-3">
                  {data.followedStories.map(story => (
-                   <div key={story.id} className="bg-white rounded-2xl p-5 border border-et-divider flex justify-between items-center group cursor-pointer hover:shadow-md transition-all">
-                     <div><div className="text-sm font-serif font-bold group-hover:text-et-red">{story.headline}</div><div className="text-[10px] font-bold text-et-meta uppercase tracking-widest mt-1 opacity-60">{story.articleCount} Current Insights</div></div>
-                     <div className="p-2 bg-et-section rounded-xl group-hover:bg-et-red group-hover:text-white transition-all"><ChevronRightIcon className="w-4 h-4" /></div>
-                   </div>
+                   <Link key={story.id} href={`/briefing/${story.id}`}>
+                     <div className="bg-white rounded-2xl p-5 border border-et-divider flex justify-between items-center group cursor-pointer hover:shadow-md transition-all">
+                       <div><div className="text-sm font-serif font-bold group-hover:text-et-red">{story.headline}</div><div className="text-[10px] font-bold text-et-meta uppercase tracking-widest mt-1 opacity-60">{story.articleCount} Current Insights</div></div>
+                       <div className="p-2 bg-et-section rounded-xl group-hover:bg-et-red group-hover:text-white transition-all"><ChevronRightIcon className="w-4 h-4" /></div>
+                     </div>
+                   </Link>
                  ))}
                </div>
              </div>

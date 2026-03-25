@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || "");
 const MODELS = [
   "gemini-2.0-flash", 
-  "gemini-2.5-flash", 
+  "gemini-1.5-flash", 
   "gemini-flash-latest", 
   "gemini-flash-lite-latest", 
   "gemini-2.0-flash-lite",

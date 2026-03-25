@@ -85,9 +85,23 @@ export default function FeedPage() {
         return;
       }
       const data = (await res.json()) as { articles: FeedArticle[] };
-      setArticles((prev) => (reset ? data.articles : [...prev, ...data.articles]));
-      setOffset((prev) => (reset ? 20 : prev + 20));
-      setHasMore(data.articles.length === 20);
+      
+      setArticles((prev) => {
+        if (reset) {
+          const existingIds = new Set(prev.map(a => a.id));
+          const newArticles = data.articles.filter(a => !existingIds.has(a.id));
+          // If all are already there, return existing
+          if (newArticles.length === 0) return prev;
+          return [...newArticles, ...prev];
+        }
+        // Deduplicate appending as well
+        const existingIds = new Set(prev.map(a => a.id));
+        const appendArticles = data.articles.filter(a => !existingIds.has(a.id));
+        return [...prev, ...appendArticles];
+      });
+
+      setOffset((prev) => (reset ? prev : prev + data.articles.length));
+      setHasMore(data.articles.length > 0);
       setLoading(false);
     },
     [loading, offset, router]
@@ -95,7 +109,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     loadFeed(true);
-  }, [loadFeed]);
+  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -280,7 +294,7 @@ export default function FeedPage() {
         </main>
 
         {/* Right Sidebar (Widgets) */}
-        <aside className="hidden lg:block w-[350px] flex-shrink-0 px-4 h-screen sticky top-0 overflow-y-auto no-scrollbar pb-10">
+        <aside className="hidden lg:block w-[350px] flex-shrink-0 px-4 h-screen sticky top-0 overflow-y-auto no-scrollbar pb-10 space-y-8">
           <TrendingSidebar />
           <PremiumAd variant="sidebar" className="mt-8" />
         </aside>

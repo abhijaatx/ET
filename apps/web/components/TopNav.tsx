@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LanguageSelector } from "./LanguageSelector";
 
 export function TopNav() {
   return (
@@ -8,8 +9,6 @@ export function TopNav() {
       <Link href="/" className="font-display text-2xl tracking-tight">
         The EconomicTimes
       </Link>
-      <div className="flex items-center gap-4 text-sm text-slate">
-      </div>
     </nav>
   );
 }

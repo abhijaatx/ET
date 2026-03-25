@@ -12,6 +12,7 @@ import interestsRoutes from "./routes/interests";
 import authorRoutes from "./routes/authors";
 import notificationsRoutes from "./routes/notifications";
 import userRoutes from "./routes/user";
+import broadcastRoutes from "./routes/broadcast";
 import { enqueueImmediateIngest, scheduleIngest } from "./queues/ingest";
 import "./workers/ingest";
 import "./workers/story-ai";
@@ -55,6 +56,7 @@ app.route("/api", interestsRoutes);
 app.route("/api", authorRoutes);
 app.route("/api", notificationsRoutes);
 app.route("/api", userRoutes);
+app.route("/api", broadcastRoutes);
 
 scheduleIngest().catch((err: unknown) => {
   console.error("Failed to schedule ingest", err);
