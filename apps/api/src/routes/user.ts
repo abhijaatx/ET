@@ -26,7 +26,7 @@ routes.get("/user/stats", authMiddleware, async (c) => {
     const [signalsStats] = await db
       .select({
         totalArticlesRead: count(articleSignals.id),
-        totalTimeSpentS: sql<number>`COALESCE(SUM(${articleSignals.timeSpentS}), 0)`,
+        totalTimeSpentS: sql<number>`COALESCE(SUM(${articleSignals.timeSpentS})::integer, 0)`,
         avgEngagement: sql<number>`COALESCE(AVG(${articleSignals.engagementScore}), 0)`
       })
       .from(articleSignals)
@@ -150,7 +150,7 @@ routes.get("/user/focus", authMiddleware, async (c) => {
   const focusData = await db
     .select({
       date: sql<string>`DATE(${articleSignals.createdAt})`,
-      totalSeconds: sql<number>`SUM(${articleSignals.timeSpentS})`
+      totalSeconds: sql<number>`SUM(${articleSignals.timeSpentS})::integer`
     })
     .from(articleSignals)
     .where(eq(articleSignals.userId, user.id))

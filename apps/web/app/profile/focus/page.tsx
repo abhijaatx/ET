@@ -30,11 +30,11 @@ export default function FocusTimePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const totalMinutes = Math.round(focusData.reduce((acc, curr) => acc + curr.totalSeconds, 0) / 60);
+  const totalMinutes = Math.round(focusData.reduce((acc, curr) => acc + Number(curr.totalSeconds), 0) / 60);
   const avgMinutes = focusData.length > 0 ? Math.round(totalMinutes / focusData.length) : 0;
 
   // Max value for chart scaling
-  const maxSeconds = Math.max(...focusData.map(d => d.totalSeconds), 1);
+  const maxSeconds = Math.max(...focusData.map(d => Number(d.totalSeconds)), 1);
 
   return (
     <div className="min-h-screen bg-et-section p-8">
