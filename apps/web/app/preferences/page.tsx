@@ -11,9 +11,12 @@ import {
   AcademicCapIcon,
   GlobeAltIcon,
   LightBulbIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  Bars3Icon
 } from "@heroicons/react/24/outline";
 import { TopNav } from "../../components/TopNav";
+import { Sidebar } from "../../components/Sidebar";
+import { SlideOver } from "../../components/SlideOver";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -31,6 +34,7 @@ export default function PreferencesPage() {
   const [topics, setTopics] = useState<Interest[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/interests`, { credentials: "include" })
@@ -115,8 +119,18 @@ export default function PreferencesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-et-section pb-20">
-      <TopNav />
+    <div className="min-h-screen bg-et-section pb-24 md:pb-0">
+      <TopNav title="Preferences" onMenuClick={() => setIsDrawerOpen(true)} />
+      
+      <SlideOver
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="The EconomicTimes"
+        side="left"
+      >
+        <Sidebar />
+      </SlideOver>
+
       <div className="max-w-4xl mx-auto px-4 py-12">
         <Link href="/profile" className="inline-flex items-center text-et-red font-bold text-xs uppercase tracking-widest mb-8 hover:translate-x-[-4px] transition-transform">
           <ChevronLeftIcon className="w-4 h-4 mr-1" />

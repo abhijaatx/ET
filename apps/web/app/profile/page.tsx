@@ -92,7 +92,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-et-section pb-24 md:pb-0">
-      <TopNav />
+      <TopNav title="Profile" onMenuClick={() => setIsDrawerOpen(true)} />
       
       <SlideOver
         open={isDrawerOpen}
