@@ -1,21 +1,21 @@
 import { db } from "../db";
-import { articles, stories, globalBroadcasts } from "@myet/db";
+import { articles, stories } from "@myet/db";
 import { and, desc, isNotNull, not, eq, inArray, sql } from "drizzle-orm";
-import { groqCompletion } from "./anthropic";
 
-export async function refreshGlobalBroadcast() {
-  console.log("[Broadcast] Refreshing global cache with deep intelligence...");
+export async function getLatestBroadcast() {
+  console.log("[Broadcast] Constructing non-stop feed from processed stories...");
   try {
-    // 1. Fetch top stories that have an AI-generated briefing, focused on TODAY
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
 
-    let topStories = await db
+    // 1. Fetch ALL stories from today that have briefings
+    const todayStories = await db
       .select({
         id: stories.id,
         headline: stories.headline,
         briefing: stories.briefingCache,
-        articleIds: stories.articleIds
+        articleIds: stories.articleIds,
+        latestArticleAt: stories.latestArticleAt
       })
       .from(stories)
       .where(
@@ -24,38 +24,30 @@ export async function refreshGlobalBroadcast() {
           sql`${stories.latestArticleAt} >= ${todayMidnight}`
         )
       )
-      .orderBy(desc(stories.latestArticleAt))
-      .limit(20); // Expanded limit for continuous feel
+      .orderBy(desc(stories.latestArticleAt));
 
     // Fallback if no stories today yet
-    if (topStories.length < 5) {
-      console.log("[Broadcast] Low volume today, falling back to last 24h");
-      const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      topStories = await db
+    let pool = todayStories;
+    if (pool.length === 0) {
+      console.log("[Broadcast] No stories today, falling back to all-time top processed");
+      pool = await db
         .select({
           id: stories.id,
           headline: stories.headline,
           briefing: stories.briefingCache,
-          articleIds: stories.articleIds
+          articleIds: stories.articleIds,
+          latestArticleAt: stories.latestArticleAt
         })
         .from(stories)
-        .where(
-          and(
-            isNotNull(stories.briefingCache),
-            sql`${stories.latestArticleAt} >= ${last24h}`
-          )
-        )
+        .where(isNotNull(stories.briefingCache))
         .orderBy(desc(stories.latestArticleAt))
-        .limit(20);
+        .limit(100);
     }
 
-    if (topStories.length === 0) {
-      console.warn("[Broadcast] No stories with briefings found.");
-      return;
-    }
+    if (pool.length === 0) return [];
 
-    // 2. Map image URLs for these stories (taking the first article's image)
-    const allStoryArticleIds = topStories.flatMap(s => s.articleIds).filter(Boolean);
+    // 2. Map images efficiently
+    const allArticleIds = pool.flatMap(s => s.articleIds).filter(Boolean);
     const storyArticles = await db
       .select({
         id: articles.id,
@@ -65,7 +57,7 @@ export async function refreshGlobalBroadcast() {
       .from(articles)
       .where(
         and(
-          inArray(articles.id, allStoryArticleIds.slice(0, 100)), // Increased safety limit
+          inArray(articles.id, allArticleIds.slice(0, 200)),
           isNotNull(articles.imageUrl),
           not(eq(articles.imageUrl, ""))
         )
@@ -78,95 +70,38 @@ export async function refreshGlobalBroadcast() {
       }
     }
 
-    // 3. Prepare the enriched data for Groq
-    const enrichedItems = topStories.map(s => {
-      const imageUrl = storyToImageMap.get(s.id);
-      // Intelligence brief is usually a string in briefingCache or an object
-      let intelligenceText = typeof s.briefing === 'string' ? s.briefing : JSON.stringify(s.briefing);
+    // 3. Map Stories to Scenes directly (No Groq synthesis required)
+    const scenes = pool.map((s, index) => {
+      const imageUrl = storyToImageMap.get(s.id) || "https://images.pexels.com/photos/3183197/pexels-photo-3183197.jpeg";
+      const briefing: any = s.briefing;
       
-      // Tight truncation to fit many stories in Groq 8B context
-      if (intelligenceText.length > 600) {
-        intelligenceText = intelligenceText.substring(0, 600) + "...";
-      }
+      const narration = briefing.executive_summary || "Analyzing latest developments...";
+      const sectionTitles = (briefing.sections || []).map((sec: any) => sec.title.replace(/-/g, " ")).slice(0, 2);
+      
+      // Heuristic duration based on narration length (words / 150wpm * 60s)
+      const wordCount = narration.split(/\s+/).length;
+      const duration = Math.max(8, Math.round((wordCount / 140) * 60));
 
       return {
-        headline: s.headline,
-        intelligence: intelligenceText,
-        imageUrl: imageUrl || ""
+        id: s.id,
+        duration: duration,
+        narration: narration,
+        visualType: index === 0 ? "breaking_news" : (index % 3 === 0 ? "tech_focus" : "market_update"),
+        overlayTitle: s.headline,
+        overlayBullets: sectionTitles.length > 0 ? sectionTitles : ["In-depth Analysis", "Market Impact"],
+        imageUrl: imageUrl
       };
-    }).filter(item => item.imageUrl);
+    }).filter(scene => scene.narration.length > 50); // Filter out empty or placeholder briefings
 
-    if (enrichedItems.length === 0) {
-      console.warn("[Broadcast] No items with images found after enrichment.");
-      return;
-    }
-
-    const prompt = `
-      You are a Lead AI News Producer for The Economic Times. 
-      Synthesize these stories into a detailed global news broadcast.
-      
-      CRITICAL: Output ONLY a JSON array of "scenes". 
-      
-      Each scene must have:
-      - duration: number (seconds)
-      - narration: string (detailed professional script using intelligence data)
-      - visualType: string (breaking_news, market_update, world_map, tech_focus, conclusion)
-      - overlayTitle: string
-      - overlayBullets: string[] (key insights)
-      - imageUrl: string (the EXACT imageUrl provided)
-      
-      Stories:
-      ${enrichedItems.map(a => `
-      HEADLINE: ${a.headline}
-      IMAGE: ${a.imageUrl}
-      INTEL: ${a.intelligence}
-      `).join("\n\n")}
-    `;
-
-    console.log("[Broadcast] Requesting expanded script from Groq...");
-    const scriptJson = await groqCompletion(
-      "You are a professional broadcast producer. Output valid JSON array only. No preamble.",
-      prompt
-    );
-
-    const scenes = JSON.parse(scriptJson);
-    
-    // Save to DB
-    await db.transaction(async (tx) => {
-      await tx.delete(globalBroadcasts);
-      await tx.insert(globalBroadcasts).values({
-        scenes: scenes,
-        createdAt: new Date()
-      });
-    });
-
-    console.log(`[Broadcast] Expanded cache refreshed with ${scenes.length} scenes`);
+    console.log(`[Broadcast] Generated ${scenes.length} scenes directly from DB.`);
     return scenes;
   } catch (err) {
-    console.error("[Broadcast] Enrichment error:", err);
-    throw err;
+    console.error("[Broadcast] Direct mapping error:", err);
+    return [];
   }
 }
 
-export async function getLatestBroadcast() {
-  const latest = await db
-    .select()
-    .from(globalBroadcasts)
-    .orderBy(desc(globalBroadcasts.createdAt))
-    .limit(1);
-
-  if (latest.length > 0) {
-    const data = latest[0];
-    const ageMs = Date.now() - (data?.createdAt?.getTime() || 0);
-    
-    // If cache is older than 20 mins, trigger a background refresh
-    if (ageMs > 20 * 60 * 1000) {
-      console.log("[Broadcast] Cache stale. Triggering background refresh.");
-      refreshGlobalBroadcast().catch(e => console.error("BG Refresh failed", e));
-    }
-    
-    return data?.scenes;
-  }
-
-  return await refreshGlobalBroadcast();
+// Keep export for compatibility but it's no longer used for the main engine
+export async function refreshGlobalBroadcast() {
+  return await getLatestBroadcast();
 }
