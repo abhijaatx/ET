@@ -97,6 +97,7 @@ export const ingestWorker = new Worker(
             content: fullContent,
             summary: tag.summary,
             url: raw.url,
+            imageUrl: raw.imageUrl,
             source: raw.source,
             author: raw.author,
             publishedAt: raw.publishedAt,

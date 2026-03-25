@@ -51,7 +51,8 @@ export function ArticleCard({ article, onClick }: ArticleCardProps) {
     console.error("Invalid date for article", article.id);
   }
 
-  const imageUrl = article.imageUrl || "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
+  // Use a unique, stable placeholder based on article ID if imageUrl is missing
+  const imageUrl = article.imageUrl || `https://picsum.photos/seed/${article.id}/600/400`;
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../db";
 import { articles, stories } from "@myet/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull, not } from "drizzle-orm";
 import { googleCompletion } from "../services/google";
 import { authMiddleware } from "../middleware/auth";
 import type { AppEnv } from "../types/app";
@@ -22,7 +22,13 @@ routes.get("/broadcast/generate", authMiddleware, async (c) => {
       })
       .from(articles)
       .innerJoin(stories, eq(articles.storyId, stories.id))
-      .where(eq(stories.briefingStale, false))
+      .where(
+        and(
+          eq(stories.briefingStale, false),
+          isNotNull(articles.imageUrl),
+          not(eq(articles.imageUrl, ""))
+        )
+      )
       .orderBy(desc(articles.createdAt))
       .limit(5);
 
@@ -59,13 +65,15 @@ routes.get("/broadcast/generate", authMiddleware, async (c) => {
     let scriptJson = rawScript;
     if (scriptJson.includes("```json")) {
        const parts = scriptJson.split("```json");
-       if (parts.length > 1) {
-         scriptJson = parts[1].split("```")[0].trim();
+       const match = parts[1];
+       if (match) {
+         scriptJson = match.split("```")[0]?.trim() ?? "";
        }
     } else if (scriptJson.includes("```")) {
        const parts = scriptJson.split("```");
-       if (parts.length > 1) {
-         scriptJson = parts[1].split("```")[0].trim();
+       const match = parts[1];
+       if (match) {
+         scriptJson = match.split("```")[0]?.trim() ?? "";
        }
     }
 
