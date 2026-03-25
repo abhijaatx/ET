@@ -8,6 +8,7 @@ import {
   ArrowPathIcon, 
   SpeakerWaveIcon,
   ChevronLeftIcon,
+  ChevronRightIcon,
   SignalIcon
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
@@ -29,6 +30,7 @@ export default function BroadcastPage() {
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [playbackKey, setPlaybackKey] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
@@ -108,9 +110,17 @@ export default function BroadcastPage() {
         console.log("[Broadcast] Restarting continuous feed...");
         setCurrentIndex(0);
         setProgress(0);
+        setPlaybackKey(prev => prev + 1);
         fetchBroadcast(true); // Silent re-fetch
     }
   }, [currentIndex, scenes.length, fetchBroadcast]);
+
+  const prev = useCallback(() => {
+    if (currentIndex > 0) {
+        setCurrentIndex(prev => prev - 1);
+        setProgress(0);
+    }
+  }, [currentIndex]);
 
   useEffect(() => {
     if (!isPlaying || currentIndex < 0 || currentIndex >= scenes.length) {
@@ -139,7 +149,7 @@ export default function BroadcastPage() {
     return () => {
       clearInterval(interval);
     };
-  }, [currentIndex, isPlaying, scenes, speak, next]);
+  }, [currentIndex, isPlaying, scenes, speak, next, playbackKey]);
 
   if (loading) {
     return (
@@ -282,12 +292,29 @@ export default function BroadcastPage() {
         <div className="max-w-7xl mx-auto">
 
             <div className="px-6 md:px-12 py-6 md:py-8 flex flex-col md:flex-row items-center gap-6 md:gap-12">
+            <div className="flex items-center gap-3 md:gap-6 shrink-0">
+                <button 
+                    onClick={prev}
+                    disabled={currentIndex === 0}
+                    className="p-3 md:p-4 rounded-full border border-et-border text-et-secondary hover:text-et-red hover:border-et-red transition-all disabled:opacity-30 disabled:hover:border-et-border disabled:hover:text-et-secondary"
+                >
+                    <ChevronLeftIcon className="w-5 h-5 md:w-6 h-6" />
+                </button>
+
                 <button 
                     onClick={() => setIsPlaying(!isPlaying)}
                     className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-et-headline text-white flex items-center justify-center hover:bg-et-red transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0"
                 >
                     {isPlaying ? <PauseIcon className="w-7 h-7 md:w-10 md:h-10" /> : <PlayIcon className="w-7 h-7 md:w-10 md:h-10 ml-1" />}
                 </button>
+
+                <button 
+                    onClick={next}
+                    className="p-3 md:p-4 rounded-full border border-et-border text-et-secondary hover:text-et-red hover:border-et-red transition-all"
+                >
+                    <ChevronRightIcon className="w-5 h-5 md:w-6 h-6" />
+                </button>
+            </div>
 
                 <div className="flex-1 space-y-2 md:space-y-4 text-center md:text-left">
                     <div className="flex items-center justify-center md:justify-start gap-4">
@@ -321,9 +348,10 @@ export default function BroadcastPage() {
                             setCurrentIndex(0);
                             setIsPlaying(true);
                             setProgress(0);
+                            setPlaybackKey(prev => prev + 1);
                         }}
                         className="p-3 md:p-4 rounded-xl border border-et-border hover:border-et-red hover:text-et-red transition-all group active:bg-et-section"
-                        title="Replay"
+                        title="Restart Show"
                     >
                         <ArrowPathIcon className="w-4 h-4 md:w-5 md:h-5 group-hover:rotate-180 transition-transform duration-700" />
                     </button>
