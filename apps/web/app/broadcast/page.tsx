@@ -204,7 +204,7 @@ export default function BroadcastPage() {
                                 transition={{ duration: 1, type: "spring" }}
                                 className="flex items-center justify-center shrink-0"
                             >
-                                <div className="relative w-32 h-32 md:w-56 md:h-56 lg:w-72 lg:h-72 rounded-2xl border-2 border-white/20 bg-white/5 backdrop-blur-xl flex items-center justify-center shadow-2xl overflow-hidden">
+                                <div className="relative w-32 h-32 md:w-56 md:h-56 lg:w-72 lg:h-72 rounded-2xl border-2 border-white/20 bg-white/5 backdrop-blur-xl flex items-center justify-center shadow-2xl overflow-hidden hidden md:flex">
                                      {currentScene.imageUrl && (
                                         <img 
                                             src={currentScene.imageUrl} 
@@ -213,7 +213,6 @@ export default function BroadcastPage() {
                                         />
                                      )}
                                     <div className="absolute inset-0 bg-et-red/10 animate-pulse" />
-                                    <SpeakerWaveIcon className="relative z-10 w-12 h-12 md:w-20 md:h-20 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
                                 </div>
                             </motion.div>
 
@@ -258,21 +257,6 @@ export default function BroadcastPage() {
             )}
            </AnimatePresence>
 
-           <div className="absolute top-4 md:top-8 right-4 md:right-8 z-30">
-               <div className="px-2 md:px-3 py-0.5 md:py-1 bg-white/10 backdrop-blur-md rounded border border-white/20 text-white text-[7px] md:text-[9px] font-black uppercase tracking-widest text-center shadow-lg">
-                  {currentScene?.visualType.replace("_", " ") ?? "BROADCASTING"}
-               </div>
-           </div>
-           
-           <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 z-30 flex items-center gap-2 md:gap-3 bg-black/60 backdrop-blur-md p-2 md:p-3 rounded-lg md:rounded-xl border border-white/10 shadow-2xl scale-75 md:scale-100 origin-bottom-left">
-              <div className="w-8 h-8 md:w-10 md:h-10 bg-et-red rounded-lg flex items-center justify-center transform -rotate-12">
-                 <SignalIcon className="w-5 h-5 md:w-6 h-6 text-white" />
-              </div>
-              <div className="pr-4">
-                 <p className="text-white text-[8px] md:text-[10px] font-black uppercase tracking-widest leading-none">Global Feed</p>
-                 <p className="text-white/50 text-[7px] md:text-[9px] font-bold uppercase tracking-tight">LIVE STUDIO</p>
-              </div>
-           </div>
         </div>
       </div>
 
