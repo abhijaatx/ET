@@ -68,8 +68,11 @@ export default function BroadcastPage() {
     }
   }, [fetchBroadcast]);
 
-  const speak = useCallback((text: string) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
+  const speak = useCallback((text: string, onEnd: () => void) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+        onEnd(); // Fallback if no speech API
+        return;
+    }
     
     // Cancel any ongoing speech
     window.speechSynthesis.cancel();
@@ -83,9 +86,27 @@ export default function BroadcastPage() {
     
     utterance.rate = 1.05; // Slightly faster for energy
     utterance.pitch = 1.0;
+
+    utterance.onend = () => {
+        onEnd();
+    };
+
+    utterance.onerror = (e) => {
+        console.error("Speech error", e);
+        onEnd(); // Continue even on error
+    };
     
     window.speechSynthesis.speak(utterance);
   }, []);
+
+  const next = useCallback(() => {
+    if (currentIndex < scenes.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+        setProgress(0);
+    } else {
+        setIsPlaying(false);
+    }
+  }, [currentIndex, scenes.length]);
 
   useEffect(() => {
     if (!isPlaying || currentIndex < 0 || currentIndex >= scenes.length) {
@@ -96,32 +117,25 @@ export default function BroadcastPage() {
     const currentScene = scenes[currentIndex];
     if (!currentScene) return;
 
-    // Trigger voice narration
-    speak(currentScene.narration);
+    // Trigger voice narration and move to next ONLY when it ends
+    speak(currentScene.narration, () => {
+        if (isPlaying) next();
+    });
 
     const durationMs = currentScene.duration * 1000;
     
     const start = Date.now();
     const interval = setInterval(() => {
       const elapsed = Date.now() - start;
-      setProgress((elapsed / durationMs) * 100);
+      // We still use currentScene.duration for the progress bar "visual" target
+      // but the actual transition happens on speech end.
+      setProgress(Math.min((elapsed / durationMs) * 100, 99));
     }, 50);
 
-    timerRef.current = setTimeout(() => {
-      clearInterval(interval);
-      if (currentIndex < scenes.length - 1) {
-        setCurrentIndex(prev => prev + 1);
-        setProgress(0);
-      } else {
-        setIsPlaying(false);
-      }
-    }, durationMs);
-
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
       clearInterval(interval);
     };
-  }, [currentIndex, isPlaying, scenes, speak]);
+  }, [currentIndex, isPlaying, scenes, speak, next]);
 
   if (loading) {
     return (
