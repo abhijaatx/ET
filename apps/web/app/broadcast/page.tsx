@@ -31,6 +31,7 @@ export default function BroadcastPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackKey, setPlaybackKey] = useState(0);
+  const expectedIndexRef = useRef(-1);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
@@ -131,9 +132,14 @@ export default function BroadcastPage() {
     const currentScene = scenes[currentIndex];
     if (!currentScene) return;
 
+    expectedIndexRef.current = currentIndex;
+
     // Trigger voice narration and move to next ONLY when it ends
     speak(currentScene.narration, () => {
-        if (isPlaying) next();
+        // Guard: Only proceed if we haven't manually moved to another story
+        if (isPlaying && expectedIndexRef.current === currentIndex) {
+            next();
+        }
     });
 
     const durationMs = currentScene.duration * 1000;
