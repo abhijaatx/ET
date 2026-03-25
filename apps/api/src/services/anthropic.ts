@@ -8,12 +8,21 @@ const groq = new Groq({
 
 // Global queue to stay under AI limits (50 RPM = 1200ms per call)
 let lastCallTime = 0;
+let pauseUntil = 0;
 const MIN_INTERVAL_MS = 1200;
 
 export async function callGroq<T>(fn: () => Promise<T>) {
   return withRetry(async () => {
     const now = Date.now();
-    const timeSinceLast = now - lastCallTime;
+    
+    // Check if we are in a 2-minute cooldown
+    if (now < pauseUntil) {
+      const waitTime = pauseUntil - now;
+      console.warn(`[AI] Cooldown active. Waiting ${Math.ceil(waitTime / 1000)}s...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+
+    const timeSinceLast = Date.now() - lastCallTime;
     
     if (timeSinceLast < MIN_INTERVAL_MS) {
       const waitTime = MIN_INTERVAL_MS - timeSinceLast + (Math.random() * 200);
@@ -57,7 +66,8 @@ export async function groqCompletion(systemPrompt: string, userPrompt: string): 
       lastError = error;
       // If it's a rate limit error (429), try the next model
       if (error?.status === 429) {
-        console.warn(`[AI] Model ${model} rate limited (429). Trying fallback...`);
+        console.warn(`[AI] Model ${model} rate limited (429). Pausing for 2 mins...`);
+        pauseUntil = Date.now() + 120 * 1000;
         continue;
       }
       throw error;
@@ -75,6 +85,13 @@ export async function streamGroqCompletion(
   signal?: AbortSignal
 ) {
   if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY is missing");
+
+  const now = Date.now();
+  if (now < pauseUntil) {
+    const waitTime = pauseUntil - now;
+    console.warn(`[AI] Cooldown active for stream. Waiting ${Math.ceil(waitTime / 1000)}s...`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
 
   let lastError: any = null;
 
@@ -105,7 +122,8 @@ export async function streamGroqCompletion(
     } catch (error: any) {
       lastError = error;
       if (error?.status === 429) {
-        console.warn(`[AI] Model ${model} rate limited (429) during stream. Trying fallback...`);
+        console.warn(`[AI] Model ${model} rate limited (429) during stream. Pausing for 2 mins...`);
+        pauseUntil = Date.now() + 120 * 1000;
         continue;
       }
       throw error;
