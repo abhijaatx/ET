@@ -145,38 +145,50 @@ export default function BroadcastPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.8 }}
+                    transition={{ duration: 1.2, ease: "easeInOut" }}
                     className="absolute inset-0"
                 >
-                    {/* Background Visual Frame */}
-                    <div className="absolute inset-0 w-full h-full bg-et-headline p-1 text-white">
-                        <div className="w-full h-full bg-gradient-to-br from-et-secondary/20 to-transparent relative overflow-hidden rounded-xl md:rounded-2xl">
-                             <motion.div
-                                animate={{ scale: [1, 1.05, 1], opacity: [0.1, 0.15, 0.1] }}
-                                transition={{ duration: 25, repeat: Infinity }}
-                                className="absolute inset-0 bg-white"
-                             />
-                             <div className="absolute inset-0 flex items-center justify-center opacity-30">
-                                <ChartBarIcon className="w-32 h-32 md:w-64 md:h-64 text-white opacity-10 animate-pulse" />
-                             </div>
-                             
-                             {/* Central Content Deck (Swaps layout on mobile) */}
-                             <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-center p-6 md:p-12 lg:p-20 z-10 gap-8 md:gap-12">
-                                <motion.div
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ duration: 0.8 }}
-                                    className="flex items-center justify-center shrink-0"
-                                >
-                                    <div className="relative w-32 h-32 md:w-48 md:h-48 lg:w-64 lg:h-64 rounded-full border-4 border-et-red/10 flex items-center justify-center">
-                                        <motion.div
-                                            animate={{ rotate: 360 }}
-                                            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-                                            className="absolute inset-0 border-t-4 border-et-red rounded-full"
+                    {/* Background Visual Frame with Ken Burns Effect */}
+                    <div className="absolute inset-0 w-full h-full bg-et-headline overflow-hidden">
+                        <motion.div
+                            initial={{ scale: 1.2, filter: "brightness(0.5) blur(4px)" }}
+                            animate={{ scale: 1, filter: "brightness(0.4) blur(0px)" }}
+                            transition={{ duration: currentScene.duration, ease: "linear" }}
+                            className="absolute inset-0 w-full h-full"
+                        >
+                            {currentScene.imageUrl ? (
+                                <img 
+                                    src={currentScene.imageUrl} 
+                                    className="w-full h-full object-cover"
+                                    alt="Scene background" 
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-et-secondary/40 to-black" />
+                            )}
+                        </motion.div>
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
+                        
+                        {/* Interactive UI Overlays */}
+                        <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-center p-6 md:p-12 lg:p-20 z-10 gap-8 md:gap-16">
+                            <motion.div
+                                initial={{ scale: 0.8, opacity: 0, rotate: -15 }}
+                                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                                transition={{ duration: 1, type: "spring" }}
+                                className="flex items-center justify-center shrink-0"
+                            >
+                                <div className="relative w-32 h-32 md:w-56 md:h-56 lg:w-72 lg:h-72 rounded-2xl border-2 border-white/20 bg-white/5 backdrop-blur-xl flex items-center justify-center shadow-2xl overflow-hidden">
+                                     {currentScene.imageUrl && (
+                                        <img 
+                                            src={currentScene.imageUrl} 
+                                            className="absolute inset-0 w-full h-full object-cover opacity-60 scale-110"
+                                            alt="Overlay background"
                                         />
-                                        <SpeakerWaveIcon className="w-10 h-10 md:w-16 md:h-16 text-et-red animate-bounce" />
-                                    </div>
-                                </motion.div>
+                                     )}
+                                    <div className="absolute inset-0 bg-et-red/10 animate-pulse" />
+                                    <SpeakerWaveIcon className="relative z-10 w-12 h-12 md:w-20 md:h-20 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+                                </div>
+                            </motion.div>
 
                                 <div className="space-y-4 md:space-y-6 text-center md:text-left">
                                     <div className="space-y-2 md:space-y-4">

@@ -2,16 +2,16 @@ import { Hono } from "hono";
 import { db } from "../db";
 import { articles, stories } from "@myet/db";
 import { and, desc, eq, isNotNull, not } from "drizzle-orm";
-import { googleCompletion } from "../services/google";
 import { authMiddleware } from "../middleware/auth";
 import type { AppEnv } from "../types/app";
+import { groqCompletion } from "../services/anthropic";
 
 const routes = new Hono<AppEnv>();
 
 routes.get("/broadcast/generate", authMiddleware, async (c) => {
   console.log("[Broadcast] Generation request received");
   try {
-    // 1. Fetch top articles with images from non-stale stories
+    // 1. Fetch top articles with images from recently ingested content
     const topArticles = await db
       .select({
         id: articles.id,
@@ -21,16 +21,14 @@ routes.get("/broadcast/generate", authMiddleware, async (c) => {
         imageUrl: articles.imageUrl
       })
       .from(articles)
-      .innerJoin(stories, eq(articles.storyId, stories.id))
       .where(
         and(
-          eq(stories.briefingStale, false),
           isNotNull(articles.imageUrl),
           not(eq(articles.imageUrl, ""))
         )
       )
       .orderBy(desc(articles.createdAt))
-      .limit(5);
+      .limit(8);
 
     console.log(`[Broadcast] Found ${topArticles.length} recent articles with images`);
 
@@ -48,34 +46,20 @@ routes.get("/broadcast/generate", authMiddleware, async (c) => {
       - visualType: string (one of: "breaking_news", "market_update", "world_map", "tech_focus", "conclusion")
       - overlayTitle: string (short title for the overlay)
       - overlayBullets: string[] (2-3 key points)
+      - imageUrl: string (PICK the most relevant imageUrl from the articles provided below)
       
       Total duration should be between 60 and 120 seconds.
-      Articles:
-      ${topArticles.map(a => `- ${a.title}: ${a.summary ?? ""}`).join("\n")}
+      Articles with their Images:
+      ${topArticles.map(a => `- [IMAGE: ${a.imageUrl}] ${a.title}: ${a.summary ?? ""}`).join("\n")}
+      
       Output ONLY the raw JSON array. No markdown code blocks.
     `;
 
-    console.log("[Broadcast] Requesting script from Gemini...");
-    const rawScript = await googleCompletion(
-      "You are a professional broadcast producer. Output valid JSON only. Do not use markdown blocks.",
+    console.log("[Broadcast] Requesting script from Groq (Llama 3.1)...");
+    const scriptJson = await groqCompletion(
+      "You are a professional broadcast producer. Output valid JSON array only. No preamble.",
       prompt
     );
-
-    // Resilience: Clean markdown code blocks if present
-    let scriptJson = rawScript;
-    if (scriptJson.includes("```json")) {
-       const parts = scriptJson.split("```json");
-       const match = parts[1];
-       if (match) {
-         scriptJson = match.split("```")[0]?.trim() ?? "";
-       }
-    } else if (scriptJson.includes("```")) {
-       const parts = scriptJson.split("```");
-       const match = parts[1];
-       if (match) {
-         scriptJson = match.split("```")[0]?.trim() ?? "";
-       }
-    }
 
     const scenes = JSON.parse(scriptJson);
     console.log(`[Broadcast] Generated ${scenes.length} scenes`);
