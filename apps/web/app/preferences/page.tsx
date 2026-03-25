@@ -13,6 +13,7 @@ import {
   LightBulbIcon,
   ChartBarIcon
 } from "@heroicons/react/24/outline";
+import { TopNav } from "../../components/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -115,6 +116,7 @@ export default function PreferencesPage() {
 
   return (
     <div className="min-h-screen bg-et-section pb-20">
+      <TopNav />
       <div className="max-w-4xl mx-auto px-4 py-12">
         <Link href="/profile" className="inline-flex items-center text-et-red font-bold text-xs uppercase tracking-widest mb-8 hover:translate-x-[-4px] transition-transform">
           <ChevronLeftIcon className="w-4 h-4 mr-1" />

@@ -19,6 +19,7 @@ import {
 import { Sidebar } from "../../components/Sidebar";
 import { SlideOver } from "../../components/SlideOver";
 import { PremiumAd } from "../../components/PremiumAd";
+import { TopNav } from "../../components/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -91,15 +92,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-et-section pb-24 md:pb-0">
-      <header className="md:hidden bg-white/90 backdrop-blur-md border-b border-et-divider px-4 py-3 sticky top-0 z-30 flex items-center justify-between">
-         <div className="text-xl font-serif font-black tracking-tight">NAV<span className="text-et-red">IGATOR</span></div>
-         <button 
-           onClick={() => setIsDrawerOpen(true)}
-           className="p-2 hover:bg-et-section rounded-full transition-colors text-et-headline"
-         >
-           <Bars3Icon className="w-6 h-6" />
-         </button>
-      </header>
+      <TopNav />
       
       <SlideOver
         open={isDrawerOpen}
