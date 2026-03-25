@@ -278,14 +278,6 @@ export default function BroadcastPage() {
 
       <div className="bg-white border-t border-et-divider shadow-[0_-20px_60px_rgba(0,0,0,0.03)] z-50">
         <div className="max-w-7xl mx-auto">
-            <div className="bg-et-red text-white py-1 md:py-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] overflow-hidden whitespace-nowrap">
-                <motion.div 
-                    animate={{ x: ["50%", "-100%"] }}
-                    transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
-                >
-                    NCLAT APPROVES RELIANCE CAPITAL RECOVERY · RBI DEFLECTS 61M CYBERATTACKS · TECH IPO OPENS TO MASSIVE RESPONSE · ENERGY SECTOR SEEKS VAT EXEMPTION · GLOBAL MARKETS SHOW RESILIENCE ·
-                </motion.div>
-            </div>
 
             <div className="px-6 md:px-12 py-6 md:py-8 flex flex-col md:flex-row items-center gap-6 md:gap-12">
                 <button 
