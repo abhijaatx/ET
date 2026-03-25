@@ -75,7 +75,7 @@ export default function BroadcastPage() {
 
   useEffect(() => {
     if (bgMusicRef.current) {
-        bgMusicRef.current.volume = 0.4;
+        bgMusicRef.current.volume = 0.75;
         if (isPlaying && !loading && musicEnabled) {
             bgMusicRef.current.play().catch(e => {
                 console.warn("Music playback failed", e);
@@ -170,6 +170,7 @@ export default function BroadcastPage() {
 
     return () => {
       clearInterval(interval);
+      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
   }, [currentIndex, isPlaying, scenes, speak, next, playbackKey]);
 
@@ -191,7 +192,7 @@ export default function BroadcastPage() {
     <div className="h-screen bg-et-section overflow-hidden flex flex-col relative text-et-headline font-sans">
       <audio 
         ref={bgMusicRef}
-        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
         loop
       />
       <div className="z-50 bg-white border-b border-et-border px-4 md:px-8 py-2 md:py-3 flex items-center justify-between shadow-sm">
