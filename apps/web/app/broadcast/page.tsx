@@ -59,13 +59,46 @@ export default function BroadcastPage() {
 
   useEffect(() => {
     fetchBroadcast();
+    // Pre-load voices for Chrome/Chromium
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
   }, [fetchBroadcast]);
 
+  const speak = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Pick a high-quality English voice
+    const voices = window.speechSynthesis.getVoices();
+    const premiumVoice = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha") || (v.lang === "en-US" && v.name.includes("Male")));
+    if (premiumVoice) utterance.voice = premiumVoice;
+    
+    utterance.rate = 1.05; // Slightly faster for energy
+    utterance.pitch = 1.0;
+    
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
   useEffect(() => {
-    if (!isPlaying || currentIndex < 0 || currentIndex >= scenes.length) return;
+    if (!isPlaying || currentIndex < 0 || currentIndex >= scenes.length) {
+      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+      return;
+    }
 
     const currentScene = scenes[currentIndex];
     if (!currentScene) return;
+
+    // Trigger voice narration
+    speak(currentScene.narration);
+
     const durationMs = currentScene.duration * 1000;
     
     const start = Date.now();
@@ -88,7 +121,7 @@ export default function BroadcastPage() {
       if (timerRef.current) clearTimeout(timerRef.current);
       clearInterval(interval);
     };
-  }, [currentIndex, isPlaying, scenes]);
+  }, [currentIndex, isPlaying, scenes, speak]);
 
   if (loading) {
     return (
