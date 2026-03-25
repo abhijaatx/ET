@@ -22,7 +22,7 @@ interface Interest {
 }
 
 interface Entity {
-  entityId: string;
+  entityName: string;
   affinityScore: number;
 }
 
@@ -55,14 +55,14 @@ export default function PreferencesPage() {
     }
   };
 
-  const handleDeleteEntity = async (id: string) => {
+  const handleDeleteEntity = async (name: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/interests/entity/${id}`, {
+      const res = await fetch(`${API_URL}/api/interests/entity/${name}`, {
         method: "DELETE",
         credentials: "include"
       });
       if (res.ok) {
-        setEntities(entities.filter(e => e.entityId !== id));
+        setEntities(entities.filter(e => e.entityName !== name));
       }
     } catch (err) {
       console.error("Failed to delete entity", err);
@@ -188,7 +188,7 @@ export default function PreferencesPage() {
                  <div className="divide-y divide-gray-50">
                    {entities.map((entity, i) => (
                       <motion.div 
-                        key={entity.entityId}
+                        key={entity.entityName}
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.2 + i * 0.05 }}
@@ -196,10 +196,10 @@ export default function PreferencesPage() {
                       >
                         <div className="flex items-center gap-3">
                           <ChartBarIcon className="w-5 h-5 text-indigo-400" />
-                          <span className="font-bold text-et-headline text-sm">{entity.entityId}</span>
+                          <span className="font-bold text-et-headline text-sm">{entity.entityName}</span>
                         </div>
                         <button 
-                          onClick={() => handleDeleteEntity(entity.entityId)}
+                          onClick={() => handleDeleteEntity(entity.entityName)}
                           className="p-2 text-et-meta hover:text-et-red opacity-0 group-hover:opacity-100 transition-all"
                         >
                           <TrashIcon className="w-4 h-4" />
