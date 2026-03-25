@@ -18,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased bg-paper font-sans">
+      <body className="antialiased bg-et-section font-sans">
         <AuthorProfileProvider>
           {children}
         </AuthorProfileProvider>
