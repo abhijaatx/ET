@@ -1,48 +1,105 @@
 import { db } from "../db";
-import { articles, globalBroadcasts } from "@myet/db";
-import { and, desc, isNotNull, not, eq } from "drizzle-orm";
+import { articles, stories, globalBroadcasts } from "@myet/db";
+import { and, desc, isNotNull, not, eq, inArray } from "drizzle-orm";
 import { groqCompletion } from "./anthropic";
 
 export async function refreshGlobalBroadcast() {
-  console.log("[Broadcast] Refreshing global cache...");
+  console.log("[Broadcast] Refreshing global cache with deep intelligence...");
   try {
-    const topArticles = await db
+    // 1. Fetch top 8 stories that have an AI-generated briefing
+    const topStories = await db
+      .select({
+        id: stories.id,
+        headline: stories.headline,
+        briefing: stories.briefingCache,
+        articleIds: stories.articleIds
+      })
+      .from(stories)
+      .where(
+        and(
+          isNotNull(stories.briefingCache)
+        )
+      )
+      .orderBy(desc(stories.latestArticleAt))
+      .limit(8);
+
+    if (topStories.length === 0) {
+      console.warn("[Broadcast] No stories with briefings found.");
+      return;
+    }
+
+    // 2. Map image URLs for these stories (taking the first article's image)
+    const allStoryArticleIds = topStories.flatMap(s => s.articleIds).filter(Boolean);
+    const storyArticles = await db
       .select({
         id: articles.id,
-        title: articles.title,
-        summary: articles.summary,
-        imageUrl: articles.imageUrl
+        imageUrl: articles.imageUrl,
+        storyId: articles.storyId
       })
       .from(articles)
       .where(
         and(
+          inArray(articles.id, allStoryArticleIds.slice(0, 50)), // Safety limit
           isNotNull(articles.imageUrl),
           not(eq(articles.imageUrl, ""))
         )
-      )
-      .orderBy(desc(articles.createdAt))
-      .limit(8);
+      );
 
-    if (topArticles.length === 0) return;
+    const storyToImageMap = new Map<string, string>();
+    for (const art of storyArticles) {
+      if (art.storyId && !storyToImageMap.has(art.storyId)) {
+        storyToImageMap.set(art.storyId, art.imageUrl!);
+      }
+    }
+
+    // 3. Prepare the enriched data for Groq
+    const enrichedItems = topStories.map(s => {
+      const imageUrl = storyToImageMap.get(s.id);
+      // Intelligence brief is usually a string in briefingCache or an object
+      let intelligenceText = typeof s.briefing === 'string' ? s.briefing : JSON.stringify(s.briefing);
+      
+      // Truncate to save tokens (Groq 8B limit is tight)
+      if (intelligenceText.length > 1000) {
+        intelligenceText = intelligenceText.substring(0, 1000) + "...";
+      }
+
+      return {
+        headline: s.headline,
+        intelligence: intelligenceText,
+        imageUrl: imageUrl || ""
+      };
+    }).filter(item => item.imageUrl);
+
+    if (enrichedItems.length === 0) {
+      console.warn("[Broadcast] No items with images found after enrichment.");
+      return;
+    }
 
     const prompt = `
-      You are an AI News Producer for The Economic Times. 
-      Synthesize these top stories into a cohesive 90-second news broadcast script.
+      You are a Lead AI News Producer for The Economic Times. 
+      Synthesize these top stories into a COMPREHENSIVE 2-minute global news broadcast.
+      
+      CRITICAL: Go beyond simple headlines. Use the provided "Intelligence Briefs" to give deep insights, data points, and context for each story.
+      
       Return a JSON array of "scenes". Each scene must have:
-      - duration: number (seconds)
-      - narration: string (the text to be read)
+      - duration: number (seconds) - Make it reasonably long if the narration is detailed (e.g. 10-20s per scene).
+      - narration: string (the professional script to be read. Must be detailed and insightful, using the intelligence data.)
       - visualType: string (one of: "breaking_news", "market_update", "world_map", "tech_focus", "conclusion")
       - overlayTitle: string (short title for the overlay)
-      - overlayBullets: string[] (2-3 key points)
-      - imageUrl: string (PICK the most relevant imageUrl from the articles provided below)
+      - overlayBullets: string[] (2-3 key points derived from the intelligence brief)
+      - imageUrl: string (ASSIGN the specific imageUrl provided for this story in the list below)
       
-      Total duration should be between 60 and 120 seconds.
-      Articles with their Images:
-      ${topArticles.map(a => `- [IMAGE: ${a.imageUrl}] ${a.title}: ${a.summary ?? ""}`).join("\n")}
+      Articles Data (Headlines + Intelligence Briefs + Image):
+      ${enrichedItems.map(a => `
+      - STORY: ${a.headline}
+      - IMAGE: ${a.imageUrl}
+      - INTELLIGENCE: ${a.intelligence}
+      `).join("\n\n")}
       
       Output ONLY the raw JSON array. No markdown code blocks.
     `;
 
+    console.log("[Broadcast] Requesting enriched script from Groq...");
     const scriptJson = await groqCompletion(
       "You are a professional broadcast producer. Output valid JSON array only. No preamble.",
       prompt
@@ -50,9 +107,8 @@ export async function refreshGlobalBroadcast() {
 
     const scenes = JSON.parse(scriptJson);
     
-    // Save to DB (Always overwrite or keep 1 latest)
+    // Save to DB
     await db.transaction(async (tx) => {
-      // Clear old broadcasts (optional, but keep it clean)
       await tx.delete(globalBroadcasts);
       await tx.insert(globalBroadcasts).values({
         scenes: scenes,
@@ -60,10 +116,10 @@ export async function refreshGlobalBroadcast() {
       });
     });
 
-    console.log(`[Broadcast] Cache refreshed successfully with ${scenes.length} scenes`);
+    console.log(`[Broadcast] Enriched cache refreshed successfully with ${scenes.length} detailed scenes`);
     return scenes;
   } catch (err) {
-    console.error("[Broadcast] Refresh error:", err);
+    console.error("[Broadcast] Enrichment error:", err);
     throw err;
   }
 }
@@ -88,6 +144,5 @@ export async function getLatestBroadcast() {
     return data?.scenes;
   }
 
-  // If no cache at all, we have to wait (first time only)
   return await refreshGlobalBroadcast();
 }
