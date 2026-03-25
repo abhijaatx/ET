@@ -15,17 +15,25 @@ export type RawArticle = {
 };
 
 const rssFeeds = [
+  // The Economic Times
   { url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms", category: "top-news" },
   { url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: "markets" },
   { url: "https://economictimes.indiatimes.com/industry/rssfeeds/13352306.cms", category: "business" },
-  { url: "https://economictimes.indiatimes.com/wealth/rssfeeds/13354030.cms", category: "wealth" },
-  { url: "https://economictimes.indiatimes.com/news/politics/and-nation/rssfeeds/10527306.cms", category: "policy" },
-  { url: "https://economictimes.indiatimes.com/news/science/rssfeeds/3911647.cms", category: "science" },
   { url: "https://economictimes.indiatimes.com/tech/rssfeeds/13358319.cms", category: "technology" },
-  { url: "https://economictimes.indiatimes.com/news/international/world/rssfeeds/2146843.cms", category: "world" },
-  { url: "https://www.reutersagency.com/feed/?best-topics=tech", category: "technology" },
+  
+  // Google News RSS (Categorized)
+  { url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-IN&gl=IN&ceid=IN:en", category: "world" },
+  { url: "https://news.google.com/rss/headlines/section/topic/NATION?hl=en-IN&gl=IN&ceid=IN:en", category: "policy" },
+  { url: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-IN&gl=IN&ceid=IN:en", category: "business" },
+  { url: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-IN&gl=IN&ceid=IN:en", category: "technology" },
+  { url: "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-IN&gl=IN&ceid=IN:en", category: "science" },
+  { url: "https://news.google.com/rss/headlines/section/topic/HEALTH?hl=en-IN&gl=IN&ceid=IN:en", category: "health" },
+  
+  // Search-based (for Finance/Market specificity)
+  { url: "https://news.google.com/rss/search?q=finance+stock+market&hl=en-IN&gl=IN&ceid=IN:en", category: "markets" },
+
+  // International
   { url: "https://www.reutersagency.com/feed/?best-topics=business", category: "business" },
-  { url: "http://feeds.bbci.co.uk/news/technology/rss.xml", category: "technology" },
   { url: "http://feeds.bbci.co.uk/news/world/rss.xml", category: "world" },
   { url: "http://feeds.bbci.co.uk/news/business/rss.xml", category: "business" }
 ];

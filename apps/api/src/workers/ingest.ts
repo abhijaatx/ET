@@ -27,11 +27,33 @@ async function generateHeadline(title: string, summary: string) {
 export const ingestWorker = new Worker(
   "ingest",
   async (job) => {
-    const rawArticles = (await fetchAllArticles()).filter(a => a.imageUrl && a.imageUrl.startsWith("http"));
-    console.log(`[ingest] Fetched ${rawArticles.length} articles with images`);
+    const rawArticles = await fetchAllArticles();
+    console.log(`[ingest] Fetched ${rawArticles.length} raw articles across all categories`);
 
     for (const raw of rawArticles) {
-      const embedding = await embedText(`${raw.title}\n${raw.content}`);
+      // Deep scrape for full content and potential image if missing/short
+      let fullContent = raw.content;
+      let currentImageUrl = raw.imageUrl;
+
+      if (!fullContent || fullContent.length < 500 || !currentImageUrl) {
+        console.log(`[ingest] Enriching: ${raw.title}`);
+        const enriched = await deepScrapeArticle(raw.url, raw.source);
+        if (enriched) {
+          if (enriched.content.length > (fullContent?.length || 0)) {
+            fullContent = enriched.content;
+          }
+          if (!currentImageUrl && enriched.imageUrl) {
+            currentImageUrl = enriched.imageUrl;
+          }
+        }
+      }
+
+      // Final Quality Check: Ensure we have content and an image
+      if (!fullContent || fullContent.length < 300 || !currentImageUrl) {
+        continue;
+      }
+
+      const embedding = await embedText(`${raw.title}\n${fullContent}`);
       const embeddingVector = sql`${`[${embedding.join(",")}]`}::vector`;
 
       const nearest = (await db.execute(
@@ -44,20 +66,10 @@ export const ingestWorker = new Worker(
         storyId = String(nearestRow.story_id);
       }
 
-      const tag = await tagArticle({ title: raw.title, content: raw.content });
+      const tag = await tagArticle({ title: raw.title, content: fullContent, initialCategory: raw.category });
       const headline = storyId
         ? null
         : await generateHeadline(raw.title, tag.summary);
-
-      // Deep scrape for full content if the initial snippet is too short
-      let fullContent = raw.content;
-      if (!fullContent || fullContent.length < 300) {
-        console.log(`[ingest] Deep scraping for: ${raw.title}`);
-        const scraped = await deepScrapeArticle(raw.url, raw.source);
-        if (scraped && scraped.length > fullContent.length) {
-          fullContent = scraped;
-        }
-      }
 
       // Add a small delay to avoid hitting Groq's rate limit during batch processing
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -97,7 +109,7 @@ export const ingestWorker = new Worker(
             content: fullContent,
             summary: tag.summary,
             url: raw.url,
-            imageUrl: raw.imageUrl,
+            imageUrl: currentImageUrl,
             source: raw.source,
             author: raw.author,
             publishedAt: raw.publishedAt,

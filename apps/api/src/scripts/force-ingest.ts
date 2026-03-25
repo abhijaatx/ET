@@ -52,12 +52,26 @@ async function forceIngest() {
         console.log(`[Force Ingest] Processing: ${raw.title}`);
         
         let actualContent = raw.content;
-        if (!actualContent || actualContent.length < 500) {
-          const deepContent = await deepScrapeArticle(raw.url, raw.source);
-          if (deepContent) {
-            actualContent = deepContent;
-            console.log(`[Force Ingest] Deep scraped content for: ${raw.title} (${actualContent.length} chars)`);
+        let currentImageUrl = raw.imageUrl;
+
+        if (!actualContent || actualContent.length < 500 || !currentImageUrl) {
+          console.log(`[Force Ingest] Enriching: ${raw.title}`);
+          const enriched = await deepScrapeArticle(raw.url, raw.source);
+          if (enriched) {
+            if (enriched.content.length > (actualContent?.length || 0)) {
+              actualContent = enriched.content;
+            }
+            if (!currentImageUrl && enriched.imageUrl) {
+              currentImageUrl = enriched.imageUrl;
+              console.log(`[Force Ingest] Found image for: ${raw.title}`);
+            }
           }
+        }
+
+        // Final Quality Check: Ensure we have content and an image
+        if (!actualContent || actualContent.length < 300 || !currentImageUrl) {
+          console.log(`[Force Ingest] Skipping (Incomplete): ${raw.title}`);
+          return;
         }
 
         const embedding = await embedText(`${raw.title}\n${actualContent}`);
@@ -104,7 +118,7 @@ async function forceIngest() {
               content: actualContent,
               summary: tag.summary,
               url: raw.url,
-              imageUrl: raw.imageUrl,
+              imageUrl: currentImageUrl,
               source: raw.source,
               author: raw.author,
               publishedAt: raw.publishedAt,

@@ -83,7 +83,7 @@ export async function scrapeETTech(): Promise<RawArticle[]> {
   }
 }
 
-export async function deepScrapeArticle(url: string, source: string): Promise<string | null> {
+export async function deepScrapeArticle(url: string, source: string): Promise<{ content: string; imageUrl: string | null } | null> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -93,6 +93,25 @@ export async function deepScrapeArticle(url: string, source: string): Promise<st
     if (!res.ok) return null;
     const html = await res.text();
     const $ = cheerio.load(html);
+
+    // Extraction: Image
+    let imageUrl = $('meta[property="og:image"]').attr("content") || 
+                   $('meta[name="twitter:image"]').attr("content") || 
+                   $('link[rel="image_src"]').attr("href");
+
+    if (!imageUrl) {
+      // Fallback for specific sites
+      if (url.includes("economictimes.indiatimes.com")) {
+        imageUrl = $(".artImg img, .article-img img").attr("src");
+      } else if (url.includes("techcrunch.com")) {
+        imageUrl = $(".article__featured-image, .wp-block-post-featured-image img").attr("src");
+      }
+    }
+
+    if (imageUrl && !imageUrl.startsWith("http")) {
+       const base = new URL(url);
+       imageUrl = new URL(imageUrl, base.origin).toString();
+    }
 
     // Clean up typical noise
     $("script, style, iframe, .ad-box, .newsletter-signup").remove();
@@ -118,7 +137,14 @@ export async function deepScrapeArticle(url: string, source: string): Promise<st
     }
 
     // Clean up: remove excessive whitespace
-    return content.replace(/\s+/g, " ").substring(0, 5000) || null;
+    const finalContent = content.replace(/\s+/g, " ").substring(0, 5000);
+    
+    if (!finalContent) return null;
+
+    return {
+      content: finalContent,
+      imageUrl: imageUrl || null
+    };
   } catch (e) {
     console.error(`Deep scrape failed for ${url}:`, e);
     return null;
