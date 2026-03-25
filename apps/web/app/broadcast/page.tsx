@@ -32,8 +32,8 @@ export default function BroadcastPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
-  const fetchBroadcast = useCallback(async () => {
-    setLoading(true);
+  const fetchBroadcast = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/broadcast/generate`, {
         credentials: "include"
@@ -104,11 +104,11 @@ export default function BroadcastPage() {
         setCurrentIndex(prev => prev + 1);
         setProgress(0);
     } else {
-        // Continuous Live Feed: Restart and re-fetch
+        // Continuous Live Feed: Restart and re-fetch silently
         console.log("[Broadcast] Restarting continuous feed...");
         setCurrentIndex(0);
         setProgress(0);
-        fetchBroadcast(); // Re-fetch to get any new articles ingested in the meantime
+        fetchBroadcast(true); // Silent re-fetch
     }
   }, [currentIndex, scenes.length, fetchBroadcast]);
 

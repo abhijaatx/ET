@@ -25,10 +25,10 @@ export async function refreshGlobalBroadcast() {
         )
       )
       .orderBy(desc(stories.latestArticleAt))
-      .limit(15);
+      .limit(20); // Expanded limit for continuous feel
 
     // Fallback if no stories today yet
-    if (topStories.length < 3) {
+    if (topStories.length < 5) {
       console.log("[Broadcast] Low volume today, falling back to last 24h");
       const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
       topStories = await db
@@ -46,7 +46,7 @@ export async function refreshGlobalBroadcast() {
           )
         )
         .orderBy(desc(stories.latestArticleAt))
-        .limit(15);
+        .limit(20);
     }
 
     if (topStories.length === 0) {
@@ -65,7 +65,7 @@ export async function refreshGlobalBroadcast() {
       .from(articles)
       .where(
         and(
-          inArray(articles.id, allStoryArticleIds.slice(0, 50)), // Safety limit
+          inArray(articles.id, allStoryArticleIds.slice(0, 100)), // Increased safety limit
           isNotNull(articles.imageUrl),
           not(eq(articles.imageUrl, ""))
         )
@@ -84,9 +84,9 @@ export async function refreshGlobalBroadcast() {
       // Intelligence brief is usually a string in briefingCache or an object
       let intelligenceText = typeof s.briefing === 'string' ? s.briefing : JSON.stringify(s.briefing);
       
-      // Truncate to save tokens (Groq 8B limit is tight)
-      if (intelligenceText.length > 1000) {
-        intelligenceText = intelligenceText.substring(0, 1000) + "...";
+      // Tight truncation to fit many stories in Groq 8B context
+      if (intelligenceText.length > 600) {
+        intelligenceText = intelligenceText.substring(0, 600) + "...";
       }
 
       return {
@@ -103,29 +103,27 @@ export async function refreshGlobalBroadcast() {
 
     const prompt = `
       You are a Lead AI News Producer for The Economic Times. 
-      Synthesize these top stories into a COMPREHENSIVE 2-minute global news broadcast.
+      Synthesize these stories into a detailed global news broadcast.
       
-      CRITICAL: Go beyond simple headlines. Use the provided "Intelligence Briefs" to give deep insights, data points, and context for each story.
+      CRITICAL: Output ONLY a JSON array of "scenes". 
       
-      Return a JSON array of "scenes". Each scene must have:
-      - duration: number (seconds) - Make it reasonably long if the narration is detailed (e.g. 10-20s per scene).
-      - narration: string (the professional script to be read. Must be detailed and insightful, using the intelligence data.)
-      - visualType: string (one of: "breaking_news", "market_update", "world_map", "tech_focus", "conclusion")
-      - overlayTitle: string (short title for the overlay)
-      - overlayBullets: string[] (2-3 key points derived from the intelligence brief)
-      - imageUrl: string (ASSIGN the specific imageUrl provided for this story in the list below)
+      Each scene must have:
+      - duration: number (seconds)
+      - narration: string (detailed professional script using intelligence data)
+      - visualType: string (breaking_news, market_update, world_map, tech_focus, conclusion)
+      - overlayTitle: string
+      - overlayBullets: string[] (key insights)
+      - imageUrl: string (the EXACT imageUrl provided)
       
-      Articles Data (Headlines + Intelligence Briefs + Image):
+      Stories:
       ${enrichedItems.map(a => `
-      - STORY: ${a.headline}
-      - IMAGE: ${a.imageUrl}
-      - INTELLIGENCE: ${a.intelligence}
+      HEADLINE: ${a.headline}
+      IMAGE: ${a.imageUrl}
+      INTEL: ${a.intelligence}
       `).join("\n\n")}
-      
-      Output ONLY the raw JSON array. No markdown code blocks.
     `;
 
-    console.log("[Broadcast] Requesting enriched script from Groq...");
+    console.log("[Broadcast] Requesting expanded script from Groq...");
     const scriptJson = await groqCompletion(
       "You are a professional broadcast producer. Output valid JSON array only. No preamble.",
       prompt
@@ -142,7 +140,7 @@ export async function refreshGlobalBroadcast() {
       });
     });
 
-    console.log(`[Broadcast] Enriched cache refreshed successfully with ${scenes.length} detailed scenes`);
+    console.log(`[Broadcast] Expanded cache refreshed with ${scenes.length} scenes`);
     return scenes;
   } catch (err) {
     console.error("[Broadcast] Enrichment error:", err);
