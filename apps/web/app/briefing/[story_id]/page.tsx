@@ -5,6 +5,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useChat } from "ai/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopNav } from "../../../components/TopNav";
+import { Sidebar } from "../../../components/Sidebar";
+import { SlideOver } from "../../../components/SlideOver";
 import { LanguageSelector } from "../../../components/LanguageSelector";
 import { useAuthorProfile } from "../../../context/AuthorProfileContext";
 import { PremiumAd } from "../../../components/PremiumAd";
@@ -74,7 +76,8 @@ export default function BriefingPage() {
   const [followLoading, setFollowLoading] = useState(false);
 
   const [currentLanguage, setCurrentLanguage] = useState("en");
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isLanguageDrawerOpen, setIsLanguageDrawerOpen] = useState(false);
+  const [isAppDrawerOpen, setIsAppDrawerOpen] = useState(false);
   const [vernacularBriefing, setVernacularBriefing] = useState<BriefingDocument | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
 
@@ -251,9 +254,9 @@ export default function BriefingPage() {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <TopNav />
+            <TopNav title="Intelligence Brief" onMenuClick={() => setIsAppDrawerOpen(true)} />
             <button
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => setIsLanguageDrawerOpen(true)}
               className="p-2 rounded-full hover:bg-mist/10 transition-all text-slate/40 hover:text-et-red group relative"
               title="Change Language"
             >
@@ -278,6 +281,15 @@ export default function BriefingPage() {
           </div>
         </div>
       </motion.header>
+
+      <SlideOver
+        open={isAppDrawerOpen}
+        onClose={() => setIsAppDrawerOpen(false)}
+        title="The EconomicTimes"
+        side="left"
+      >
+        <Sidebar />
+      </SlideOver>
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         {/* Left Pane: Briefing & AI Chat */}
@@ -503,13 +515,13 @@ export default function BriefingPage() {
 
       {/* Language Drawer */}
       <AnimatePresence>
-        {isDrawerOpen && (
+        {isLanguageDrawerOpen && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsDrawerOpen(false)}
+              onClick={() => setIsLanguageDrawerOpen(false)}
               className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-40"
             />
             <motion.div
@@ -522,7 +534,7 @@ export default function BriefingPage() {
               <div className="flex items-center justify-between mb-12">
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40">Select Language</h2>
                 <button 
-                  onClick={() => setIsDrawerOpen(false)}
+                  onClick={() => setIsLanguageDrawerOpen(false)}
                   className="p-2 rounded-full hover:bg-mist/20 transition-all"
                 >
                   <X className="w-4 h-4" />
@@ -538,7 +550,7 @@ export default function BriefingPage() {
                     currentLanguage={currentLanguage}
                     onLanguageChange={(lang) => {
                       setCurrentLanguage(lang);
-                      setIsDrawerOpen(false);
+                      setIsLanguageDrawerOpen(false);
                     }}
                   />
                 </div>
