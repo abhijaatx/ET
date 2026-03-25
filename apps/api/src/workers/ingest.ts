@@ -155,6 +155,14 @@ export const ingestWorker = new Worker(
         }
       });
     }
+
+    // Refresh the global broadcast after ingestion to keep it "Ready" and fast.
+    try {
+      const { refreshGlobalBroadcast } = await import("../services/broadcast_cache");
+      await refreshGlobalBroadcast();
+    } catch (e) {
+      console.error("[ingest] Failed to refresh global broadcast", e);
+    }
   },
   {
     connection: redis as any

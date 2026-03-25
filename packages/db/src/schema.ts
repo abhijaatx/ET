@@ -200,6 +200,12 @@ export const userStoryFollows = pgTable(
   })
 );
 
+export const globalBroadcasts = pgTable("global_broadcasts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  scenes: jsonb("scenes").notNull().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});
+
 export type Article = typeof articles.$inferSelect;
 export type Story = typeof stories.$inferSelect;
 export type User = typeof users.$inferSelect;
