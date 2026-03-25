@@ -32,6 +32,7 @@ export default function BroadcastPage() {
   const [progress, setProgress] = useState(0);
   const [playbackKey, setPlaybackKey] = useState(0);
   const expectedIndexRef = useRef(-1);
+  const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
@@ -70,6 +71,17 @@ export default function BroadcastPage() {
       };
     }
   }, [fetchBroadcast]);
+
+  useEffect(() => {
+    if (bgMusicRef.current) {
+        bgMusicRef.current.volume = 0.4;
+        if (isPlaying && !loading) {
+            bgMusicRef.current.play().catch(e => console.warn("Music playback blocked by browser policy", e));
+        } else {
+            bgMusicRef.current.pause();
+        }
+    }
+  }, [isPlaying, loading]);
 
   const speak = useCallback((text: string, onEnd: () => void) => {
     if (typeof window === "undefined" || !window.speechSynthesis) {
@@ -173,6 +185,11 @@ export default function BroadcastPage() {
 
   return (
     <div className="h-screen bg-et-section overflow-hidden flex flex-col relative text-et-headline font-sans">
+      <audio 
+        ref={bgMusicRef}
+        src="https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3"
+        loop
+      />
       <div className="z-50 bg-white border-b border-et-border px-4 md:px-8 py-2 md:py-3 flex items-center justify-between shadow-sm">
         <button 
           onClick={() => router.back()}
