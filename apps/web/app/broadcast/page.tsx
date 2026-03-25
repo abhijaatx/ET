@@ -8,8 +8,7 @@ import {
   ArrowPathIcon, 
   SpeakerWaveIcon,
   ChevronLeftIcon,
-  SignalIcon,
-  ChartBarIcon
+  SignalIcon
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 
@@ -18,9 +17,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 interface Scene {
   duration: number;
   narration: string;
-  visualType: "breaking_news" | "market_update" | "world_map" | "tech_focus" | "conclusion";
+  visualType: "breaking_news" | "market_update" | "world_map" | "tech_focus" | "conclusion" | "image" | "video";
   overlayTitle: string;
   overlayBullets: string[];
+  imageUrl: string;
 }
 
 export default function BroadcastPage() {
@@ -85,7 +85,7 @@ export default function BroadcastPage() {
     }, durationMs);
 
     return () => {
-      clearTimeout(timerRef.current!);
+      if (timerRef.current) clearTimeout(timerRef.current);
       clearInterval(interval);
     };
   }, [currentIndex, isPlaying, scenes]);
@@ -106,7 +106,6 @@ export default function BroadcastPage() {
 
   return (
     <div className="h-screen bg-et-section overflow-hidden flex flex-col relative text-et-headline font-sans">
-      {/* Mobile-Friendly Navigation Bar */}
       <div className="z-50 bg-white border-b border-et-border px-4 md:px-8 py-2 md:py-3 flex items-center justify-between shadow-sm">
         <button 
           onClick={() => router.back()}
@@ -131,12 +130,9 @@ export default function BroadcastPage() {
         </div>
       </div>
 
-      {/* Main Feature Area (Responsive Stage) */}
       <div className="flex-1 min-h-0 flex flex-col p-4 md:p-10 items-center justify-center relative bg-et-section overflow-y-auto md:overflow-hidden">
-        {/* Subtle geometric pattern */}
         <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/grid-me.png')]" />
         
-        {/* Responsive Stage: Portrait on mobile, Landscape on Desktop */}
         <div className="w-full max-w-5xl aspect-[9/16] md:aspect-video bg-white rounded-2xl md:rounded-3xl border border-et-border shadow-soft overflow-hidden relative group max-h-[70vh] md:max-h-[60vh]">
            <AnimatePresence mode="wait">
             {currentScene && (
@@ -148,10 +144,9 @@ export default function BroadcastPage() {
                     transition={{ duration: 1.2, ease: "easeInOut" }}
                     className="absolute inset-0"
                 >
-                    {/* Background Visual Frame with Ken Burns Effect */}
                     <div className="absolute inset-0 w-full h-full bg-et-headline overflow-hidden">
                         <motion.div
-                            initial={{ scale: 1.2, filter: "brightness(0.5) blur(4px)" }}
+                            initial={{ scale: 1.1, filter: "brightness(0.5) blur(4px)" }}
                             animate={{ scale: 1, filter: "brightness(0.4) blur(0px)" }}
                             transition={{ duration: currentScene.duration, ease: "linear" }}
                             className="absolute inset-0 w-full h-full"
@@ -169,7 +164,6 @@ export default function BroadcastPage() {
 
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
                         
-                        {/* Interactive UI Overlays */}
                         <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-center p-6 md:p-12 lg:p-20 z-10 gap-8 md:gap-16">
                             <motion.div
                                 initial={{ scale: 0.8, opacity: 0, rotate: -15 }}
@@ -190,49 +184,47 @@ export default function BroadcastPage() {
                                 </div>
                             </motion.div>
 
-                                <div className="space-y-4 md:space-y-6 text-center md:text-left">
-                                    <div className="space-y-2 md:space-y-4">
-                                        <motion.div 
-                                            initial={{ y: 20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: 0.2 }}
-                                            className="flex items-center justify-center md:justify-start gap-3"
-                                        >
-                                            <div className="w-4 h-0.5 bg-et-red hidden md:block" />
-                                            <span className="text-et-red text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em]">Briefing Analysis</span>
-                                        </motion.div>
-                                        <motion.h1 
-                                            initial={{ y: 20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: 0.4 }}
-                                            className="text-2xl md:text-5xl lg:text-5xl font-serif font-black leading-tight tracking-tight text-white drop-shadow-md"
-                                        >
-                                            {currentScene.overlayTitle}
-                                        </motion.h1>
-                                    </div>
-                                    <ul className="space-y-2 md:space-y-3 inline-block text-left">
-                                        {currentScene.overlayBullets.map((bullet, i) => (
-                                            <motion.li 
-                                                key={i}
-                                                initial={{ opacity: 0, x: -10 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: 0.6 + i * 0.2 }}
-                                                className="flex items-center gap-3 md:gap-4 text-white/80 text-sm md:text-xl font-medium tracking-tight"
-                                            >
-                                                <div className="w-1 h-1 md:w-1.5 md:h-1.5 bg-et-red rounded-full shrink-0 shadow-[0_0_8px_rgba(226,27,34,0.6)]" />
-                                                {bullet}
-                                            </motion.li>
-                                        ))}
-                                    </ul>
+                            <div className="space-y-4 md:space-y-6 text-center md:text-left">
+                                <div className="space-y-2 md:space-y-4">
+                                    <motion.div 
+                                        initial={{ y: 20, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: 0.2 }}
+                                        className="flex items-center justify-center md:justify-start gap-3"
+                                    >
+                                        <div className="w-4 h-0.5 bg-et-red hidden md:block" />
+                                        <span className="text-et-red text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em]">Briefing Analysis</span>
+                                    </motion.div>
+                                    <motion.h1 
+                                        initial={{ y: 20, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: 0.4 }}
+                                        className="text-2xl md:text-5xl lg:text-5xl font-serif font-black leading-tight tracking-tight text-white drop-shadow-md"
+                                    >
+                                        {currentScene.overlayTitle}
+                                    </motion.h1>
                                 </div>
-                             </div>
-                        </div>
+                                <ul className="space-y-2 md:space-y-3 inline-block text-left">
+                                    {currentScene.overlayBullets.map((bullet, i) => (
+                                        <motion.li 
+                                            key={i}
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: 0.6 + i * 0.2 }}
+                                            className="flex items-center gap-3 md:gap-4 text-white/80 text-sm md:text-xl font-medium tracking-tight"
+                                        >
+                                            <div className="w-1 h-1 md:w-1.5 md:h-1.5 bg-et-red rounded-full shrink-0 shadow-[0_0_8px_rgba(226,27,34,0.6)]" />
+                                            {bullet}
+                                        </motion.li>
+                                    ))}
+                                </ul>
+                            </div>
+                         </div>
                     </div>
                 </motion.div>
             )}
            </AnimatePresence>
 
-           {/* Permanent HUD Overlays (Sized per device) */}
            <div className="absolute top-4 md:top-8 right-4 md:right-8 z-30">
                <div className="px-2 md:px-3 py-0.5 md:py-1 bg-white/10 backdrop-blur-md rounded border border-white/20 text-white text-[7px] md:text-[9px] font-black uppercase tracking-widest text-center shadow-lg">
                   {currentScene?.visualType.replace("_", " ") ?? "BROADCASTING"}
@@ -251,10 +243,8 @@ export default function BroadcastPage() {
         </div>
       </div>
 
-      {/* Narrative Section (Responsive Layout) */}
       <div className="bg-white border-t border-et-divider shadow-[0_-20px_60px_rgba(0,0,0,0.03)] z-50">
         <div className="max-w-7xl mx-auto">
-            {/* Red Ticker Strip */}
             <div className="bg-et-red text-white py-1 md:py-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] overflow-hidden whitespace-nowrap">
                 <motion.div 
                     animate={{ x: ["50%", "-100%"] }}
