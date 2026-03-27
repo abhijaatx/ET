@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useChat } from "ai/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,6 +56,13 @@ const item = {
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 15 } }
 };
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  hi: "Hindi",
+  bn: "Bangla",
+  ta: "Tamil",
+  te: "Telugu",
+};
+
 export default function BriefingPage() {
   const { openProfile } = useAuthorProfile();
   const { user } = useAuth();
@@ -88,39 +95,66 @@ export default function BriefingPage() {
   const [vernacularArticles, setVernacularArticles] = useState<Record<string, { title: string; content: string }>>({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [articleTranslatingId, setArticleTranslatingId] = useState<string | null>(null);
+  const vernacularRequestRef = useRef(0);
+  const articleTranslationRequestRef = useRef(0);
 
   useEffect(() => {
     if (currentLanguage === "en") {
+      vernacularRequestRef.current += 1;
       setVernacularBriefing(null);
       setVernacularStoryArc(null);
       setVernacularArticles({});
+      setIsTranslating(false);
       return;
     }
 
+    const requestId = ++vernacularRequestRef.current;
+    const controller = new AbortController();
+
     const fetchVernacular = async () => {
       setIsTranslating(true);
+      setVernacularBriefing(null);
+      setVernacularStoryArc(null);
+
       try {
-        // Fetch Briefing
-        const briefingRes = await fetch(`/api/briefing/${storyId}/vernacular/${currentLanguage}`, { credentials: "include" });
-        if (briefingRes.ok) {
-          const data = await briefingRes.json();
-          setVernacularBriefing(data);
+        const [briefingRes, arcRes] = await Promise.all([
+          fetch(`/api/briefing/${storyId}/vernacular/${currentLanguage}`, {
+            credentials: "include",
+            signal: controller.signal,
+          }),
+          fetch(`/api/story-arc/${storyId}/vernacular/${currentLanguage}`, {
+            credentials: "include",
+            signal: controller.signal,
+          }),
+        ]);
+
+        if (requestId !== vernacularRequestRef.current) {
+          return;
         }
 
-        // Fetch Story Arc
-        const arcRes = await fetch(`/api/story-arc/${storyId}/vernacular/${currentLanguage}`, { credentials: "include" });
-        if (arcRes.ok) {
-          const data = await arcRes.json();
-          setVernacularStoryArc(data);
+        if (briefingRes.ok) {
+          setVernacularBriefing(await briefingRes.json());
         }
-      } catch (e) {
-        console.error("Failed to fetch vernacular content:", e);
+
+        if (arcRes.ok) {
+          setVernacularStoryArc(await arcRes.json());
+        }
+      } catch (e: any) {
+        if (e?.name !== "AbortError") {
+          console.error("Failed to fetch vernacular content:", e);
+        }
       } finally {
-        setIsTranslating(false);
+        if (requestId === vernacularRequestRef.current) {
+          setIsTranslating(false);
+        }
       }
     };
 
-    fetchVernacular();
+    void fetchVernacular();
+
+    return () => {
+      controller.abort();
+    };
   }, [storyId, currentLanguage]);
 
   useEffect(() => {
@@ -201,12 +235,22 @@ export default function BriefingPage() {
     
     const cacheKey = `${activeSource.id}_${currentLanguage}`;
     if (vernacularArticles[cacheKey]) return;
+    const requestId = ++articleTranslationRequestRef.current;
+    const controller = new AbortController();
 
     const translate = async () => {
       setArticleTranslatingId(activeSource.id);
       try {
         console.log(`[Vernacular] Fetching translation for article ${activeSource.id} in ${currentLanguage}...`);
-        const res = await fetch(`/api/articles/${activeSource.id}/vernacular/${currentLanguage}`, { credentials: "include" });
+        const res = await fetch(`/api/articles/${activeSource.id}/vernacular/${currentLanguage}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        if (requestId !== articleTranslationRequestRef.current) {
+          return;
+        }
+
         if (res.ok) {
           const data = await res.json();
           console.log(`[Vernacular] Received translation for ${activeSource.id}:`, data);
@@ -217,13 +261,22 @@ export default function BriefingPage() {
         } else {
           console.error(`[Vernacular] Translation failed for ${activeSource.id}: ${res.status}`);
         }
-      } catch (e) {
-        console.error("Failed to translate article:", e);
+      } catch (e: any) {
+        if (e?.name !== "AbortError") {
+          console.error("Failed to translate article:", e);
+        }
       } finally {
-        setArticleTranslatingId(null);
+        if (requestId === articleTranslationRequestRef.current) {
+          setArticleTranslatingId(null);
+        }
       }
     };
-    translate();
+
+    void translate();
+
+    return () => {
+      controller.abort();
+    };
   }, [activeSource, currentLanguage, vernacularArticles]);
 
   useEffect(() => {
@@ -324,6 +377,13 @@ export default function BriefingPage() {
     return () => clearInterval(interval);
   }, [storyId, sourceId, briefing, articles]);
 
+  const displayedBriefing = currentLanguage === "en" ? briefing : (vernacularBriefing ?? briefing);
+  const displayedStoryArc = currentLanguage === "en" ? storyArc : (vernacularStoryArc ?? storyArc);
+  const activeArticleTranslation =
+    activeSource && currentLanguage !== "en"
+      ? vernacularArticles[`${activeSource.id}_${currentLanguage}`]
+      : null;
+
   return (
     <div className="h-screen flex flex-col bg-paper overflow-hidden font-display">
       <motion.header 
@@ -422,21 +482,21 @@ export default function BriefingPage() {
                           <h1 className="text-3xl md:text-5xl font-black leading-[1.1] text-ink mb-10 decoration-et-red/10 animate-fade-in pr-4">
                             {isTranslating ? (
                               <span className="flex items-center gap-3 italic text-slate/30 text-2xl md:text-3xl animate-pulse">
-                                Adapting to {currentLanguage === 'hi' ? 'Hindi' : currentLanguage === 'ta' ? 'Tamil' : currentLanguage === 'te' ? 'Telugu' : 'Bengali'}...
+                                Adapting to {LANGUAGE_NAMES[currentLanguage] ?? currentLanguage}...
                               </span>
                             ) : (
-                              (vernacularBriefing || briefing)?.headline
+                              displayedBriefing?.headline
                             )}
                           </h1>
                         </motion.section>
 
                         {/* Executive Summary Section */}
-                        {(vernacularBriefing || briefing)?.executive_summary && (
+                        {displayedBriefing?.executive_summary && (
                           <motion.section variants={item} className="relative">
                             <div className="absolute -left-4 md:-left-8 top-0 bottom-0 w-1 bg-et-red opacity-20 rounded-full" />
                             <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-et-red px-2 mb-4">Executive Intel</h2>
                             <p className="text-xl md:text-2xl font-serif font-bold leading-relaxed text-ink italic">
-                              {isTranslating ? '...' : (vernacularBriefing || briefing)?.executive_summary}
+                              {isTranslating ? '...' : displayedBriefing?.executive_summary}
                             </p>
                           </motion.section>
                         )}
@@ -445,7 +505,7 @@ export default function BriefingPage() {
                         <section className="space-y-6">
                           <motion.h2 variants={item} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate/40 px-2">Analysis Sections</motion.h2>
                           <div className="grid gap-4">
-                            {(vernacularBriefing || briefing)?.sections.map((section) => (
+                            {displayedBriefing?.sections.map((section) => (
                               <motion.details
                                 variants={item}
                                 key={section.id}
@@ -479,14 +539,14 @@ export default function BriefingPage() {
                       </div>
                     ) : (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="my-auto mx-auto max-w-4xl w-full">
-                        {(vernacularStoryArc || storyArc) ? (
+                        {displayedStoryArc ? (
                           <BriefingStoryArc data={{
-                            ...(vernacularStoryArc || storyArc)!,
-                            timeline: (vernacularStoryArc || storyArc)!.timeline.map(item => ({
+                            ...displayedStoryArc,
+                            timeline: displayedStoryArc.timeline.map(item => ({
                               ...item,
                               author: articles.find(a => a.id === item.article_id)?.author || undefined
                             })),
-                            contrarian_views: (vernacularStoryArc || storyArc)!.contrarian_views.map(item => ({
+                            contrarian_views: displayedStoryArc.contrarian_views.map(item => ({
                               ...item,
                               author: articles.find(a => a.id === item.source_article_id)?.author || undefined
                             }))
@@ -534,7 +594,7 @@ export default function BriefingPage() {
                     {articleTranslatingId === activeSource.id ? "Translating Source..." : "Primary Source"}
                   </span>
                   <h2 className="text-2xl md:text-3xl font-display leading-tight">
-                    {vernacularArticles[`${activeSource.id}_${currentLanguage}`]?.title || activeSource.title}
+                    {activeArticleTranslation?.title || activeSource.title}
                   </h2>
                   {activeSource.author && (
                     <p className="text-[10px] font-bold uppercase tracking-widest text-ink/40 mt-1">BY {activeSource.author}</p>
@@ -550,7 +610,7 @@ export default function BriefingPage() {
                     <div className="h-4 bg-mist/20 rounded w-4/5" />
                   </div>
                 ) : (
-                  (vernacularArticles[`${activeSource.id}_${currentLanguage}`]?.content || activeSource.content)
+                  (activeArticleTranslation?.content || activeSource.content)
                     .split("\n\n").map((p, i) => <p key={i} className="mb-6">{p}</p>)
                 )}
               </div>

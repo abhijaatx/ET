@@ -7,7 +7,7 @@ export const LANGUAGES = [
   { code: "hi", name: "Hindi", label: "हि" },
   { code: "ta", name: "Tamil", label: "த" },
   { code: "te", name: "Telugu", label: "తె" },
-  { code: "bn", name: "Bengali", label: "বা" }
+  { code: "bn", name: "Bangla", label: "বা" }
 ];
 
 interface LanguageSelectorProps {
