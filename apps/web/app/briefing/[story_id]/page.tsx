@@ -205,13 +205,17 @@ export default function BriefingPage() {
     const translate = async () => {
       setArticleTranslatingId(activeSource.id);
       try {
+        console.log(`[Vernacular] Fetching translation for article ${activeSource.id} in ${currentLanguage}...`);
         const res = await fetch(`/api/articles/${activeSource.id}/vernacular/${currentLanguage}`, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
+          console.log(`[Vernacular] Received translation for ${activeSource.id}:`, data);
           setVernacularArticles(prev => ({
             ...prev,
             [cacheKey]: data
           }));
+        } else {
+          console.error(`[Vernacular] Translation failed for ${activeSource.id}: ${res.status}`);
         }
       } catch (e) {
         console.error("Failed to translate article:", e);

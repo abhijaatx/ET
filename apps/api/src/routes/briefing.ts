@@ -213,10 +213,21 @@ briefingRoutes.get("/articles/:articleId/vernacular/:lang", optionalAuthMiddlewa
   }
 
   try {
+    let contentToTranslate = found.content || "";
+    if (!contentToTranslate || contentToTranslate.length < 300 || contentToTranslate === found.title) {
+      console.log(`[Vernacular] Content sparse for article ${articleId}, attempting deep scrape...`);
+      const deep = await deepScrapeArticle(found.url, found.source);
+      if (deep && deep.content && deep.content.length > contentToTranslate.length) {
+        contentToTranslate = deep.content;
+        // Update DB with better content
+        db.update(articles).set({ content: deep.content }).where(eq(articles.id, articleId)).execute().catch(() => {});
+      }
+    }
+
     const translated = await translateArticle({
       lang,
       title: found.title,
-      content: found.content
+      content: contentToTranslate
     });
 
     const newCache = { ...cache, [lang]: translated };

@@ -2,11 +2,6 @@ import { env } from "../env";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || "");
-function cleanJson(text: string): string {
-  // Remove markdown code blocks if present
-  return text.replace(/```json\n?|```\n?/g, "").trim();
-}
-
 const MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-latest",
@@ -17,6 +12,17 @@ const MODELS = [
   "gemini-1.5-pro",
   "gemini-1.5-pro-latest"
 ];
+
+function cleanJson(text: string): string {
+  // Extract content between first { and last }
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+      return text.substring(start, end + 1);
+  }
+  // Fallback for markdown code blocks
+  return text.replace(/```json\n?|```\n?/g, "").trim();
+}
 
 export async function geminiCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
   if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");

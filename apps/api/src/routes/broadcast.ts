@@ -17,17 +17,16 @@ routes.get("/broadcast/generate", async (c) => {
 });
 
 const handleTts = async (c: any) => {
-  const text =
-    c.req.method === "POST"
-      ? ((await c.req.json().catch(() => null)) as { text?: string } | null)?.text
-      : c.req.query("text");
+  const body = c.req.method === "POST" ? await c.req.json().catch(() => ({})) : {};
+  const text = c.req.method === "POST" ? body.text : c.req.query("text");
+  const lang = c.req.method === "POST" ? body.lang : c.req.query("lang");
 
   if (!text) return c.json({ error: "No text provided" }, 400);
 
-  console.log(`[TTS] Processing request (${c.req.method}) for text length: ${text.length}`);
+  console.log(`[TTS] Processing request (${c.req.method}) for text length: ${text.length}, lang: ${lang || 'en'}`);
 
   try {
-    const stream = await generateGoogleSpeech(text);
+    const stream = await generateGoogleSpeech(text, lang);
     const headers: Record<string, string> = {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "public, max-age=3600",

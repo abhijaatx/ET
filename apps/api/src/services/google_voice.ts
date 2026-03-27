@@ -1,4 +1,19 @@
-export async function generateGoogleSpeech(text: string): Promise<ReadableStream> {
+export async function generateGoogleSpeech(text: string, lang = "en"): Promise<ReadableStream> {
+  // Map internal lang codes to Google TTS codes
+  const langMap: Record<string, string> = {
+    en: "en",
+    hi: "hi",
+    ta: "ta",
+    te: "te",
+    bn: "bn",
+    mr: "mr",
+    gu: "gu",
+    kn: "kn",
+    ml: "ml"
+  };
+
+  const targetLang = langMap[lang] || "en";
+
   // Unofficial Google Translate TTS has a 200 char limit
   const MAX_CHUNK_LEN = 200;
   
@@ -11,9 +26,19 @@ export async function generateGoogleSpeech(text: string): Promise<ReadableStream
     
     // Try to find a sentence boundary
     if (endPos < text.length) {
-      const lastPunct = text.lastIndexOf(".", endPos);
-      if (lastPunct > currentPos + 50) { // Only break if we have a reasonable chunk
-        endPos = lastPunct + 1;
+      // Split by common sentence terminators across languages
+      const terminators = [".", "!", "?", "।", "।"]; // English and Hindi/Bengali full stops
+      let bestEnd = -1;
+      
+      for (const t of terminators) {
+        const lastPunct = text.lastIndexOf(t, endPos);
+        if (lastPunct > currentPos + 50) {
+          bestEnd = Math.max(bestEnd, lastPunct + 1);
+        }
+      }
+
+      if (bestEnd !== -1) {
+        endPos = bestEnd;
       } else {
         const lastSpace = text.lastIndexOf(" ", endPos);
         if (lastSpace > currentPos + 50) {
@@ -26,7 +51,7 @@ export async function generateGoogleSpeech(text: string): Promise<ReadableStream
     currentPos = endPos;
   }
 
-  console.log(`[Google TTS] Splitting ${text.length} chars into ${chunks.length} chunks`);
+  console.log(`[Google TTS] Splitting ${text.length} chars into ${chunks.length} chunks (Lang: ${targetLang})`);
 
   // Create a combined stream
   const { readable, writable } = new TransformStream();
@@ -41,7 +66,7 @@ export async function generateGoogleSpeech(text: string): Promise<ReadableStream
         const url = "https://translate.google.com/translate_tts?" + new URLSearchParams({
           ie: "UTF-8",
           q: chunk,
-          tl: "en",
+          tl: targetLang,
           client: "tw-ob"
         }).toString();
 
