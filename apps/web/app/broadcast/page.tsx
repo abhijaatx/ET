@@ -32,10 +32,145 @@ export default function BroadcastPage() {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [progress, setProgress] = useState(0);
   const [playbackKey, setPlaybackKey] = useState(0);
+  const [isAudioBlocked, setIsAudioBlocked] = useState(false);
   const expectedIndexRef = useRef(-1);
+  const isNavigatingRef = useRef(false);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
+
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speakRequestRef = useRef(0);
+  const prefetchedAudioMap = useRef<Map<string, string>>(new Map());
+  const inflightAudioMap = useRef<Map<string, Promise<string>>>(new Map());
+
+  const stopCurrentAudio = useCallback(() => {
+    speakRequestRef.current += 1;
+
+    if (!currentAudioRef.current) {
+      return;
+    }
+
+    currentAudioRef.current.onended = null;
+    currentAudioRef.current.onerror = null;
+    currentAudioRef.current.onplay = null;
+    currentAudioRef.current.onplaying = null;
+    currentAudioRef.current.onwaiting = null;
+    currentAudioRef.current.onstalled = null;
+    currentAudioRef.current.oncanplaythrough = null;
+    currentAudioRef.current.pause();
+    currentAudioRef.current.src = "";
+    currentAudioRef.current.load();
+    currentAudioRef.current = null;
+  }, []);
+
+  const prunePrefetchedAudio = useCallback((nextScenes: Scene[]) => {
+    const nextNarrations = new Set(nextScenes.map((scene) => scene.narration));
+
+    for (const [text, objectUrl] of prefetchedAudioMap.current.entries()) {
+      if (nextNarrations.has(text)) {
+        continue;
+      }
+
+      URL.revokeObjectURL(objectUrl);
+      prefetchedAudioMap.current.delete(text);
+    }
+  }, []);
+
+  const fetchAudioUrl = useCallback(async (text: string) => {
+    const cachedAudioUrl = prefetchedAudioMap.current.get(text);
+    if (cachedAudioUrl) {
+      return cachedAudioUrl;
+    }
+
+    const inflightRequest = inflightAudioMap.current.get(text);
+    if (inflightRequest) {
+      return inflightRequest;
+    }
+
+    console.log(`[TTS] Fetching narration audio: ${text.substring(0, 30)}...`);
+
+    const request = fetch(`${API_URL}/api/broadcast/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const message = await res.text();
+          throw new Error(message || `TTS request failed with ${res.status}`);
+        }
+
+        const audioBlob = await res.blob();
+        const objectUrl = URL.createObjectURL(audioBlob);
+        prefetchedAudioMap.current.set(text, objectUrl);
+        return objectUrl;
+      })
+      .finally(() => {
+        inflightAudioMap.current.delete(text);
+      });
+
+    inflightAudioMap.current.set(text, request);
+    return request;
+  }, []);
+
+  const prefetch = useCallback((text: string) => {
+    if (!text || prefetchedAudioMap.current.has(text) || inflightAudioMap.current.has(text)) {
+      return;
+    }
+
+    console.log(`[TTS] Prefetching next narration: ${text.substring(0, 30)}...`);
+    void fetchAudioUrl(text).catch((err) => {
+      console.error("[TTS] Prefetch failed:", err);
+    });
+  }, [fetchAudioUrl]);
+
+  const speak = useCallback(async (text: string, onEnd: () => void) => {
+    stopCurrentAudio();
+    const requestId = speakRequestRef.current;
+
+    try {
+      const audioUrl = await fetchAudioUrl(text);
+
+      if (speakRequestRef.current !== requestId) {
+        return;
+      }
+
+      const audio = new Audio(audioUrl);
+      audio.volume = 1.0;
+      currentAudioRef.current = audio;
+
+      audio.onplay = () => console.log("[TTS] Groq Audio Started");
+      audio.onplaying = () => console.log("[TTS] Groq Audio Playing");
+      audio.onwaiting = () => console.log("[TTS] Groq Audio Buffering...");
+      audio.onstalled = () => console.log("[TTS] Groq Audio Stalled");
+      audio.oncanplaythrough = () => console.log("[TTS] Groq Audio Ready to play through");
+      audio.onended = () => {
+        console.log("[TTS] Groq Audio Ended");
+        if (speakRequestRef.current === requestId) {
+          onEnd();
+        }
+      };
+      audio.onerror = () => {
+        console.error("[TTS] Groq Audio Error:", audio.error);
+        if (speakRequestRef.current === requestId) {
+          setTimeout(onEnd, 3000);
+        }
+      };
+
+      await audio.play();
+      setIsAudioBlocked(false);
+    } catch (err: any) {
+      console.error("[TTS] Play failed:", err);
+      if (err?.name === "NotAllowedError" || String(err?.message ?? "").includes("interact")) {
+        setIsAudioBlocked(true);
+      } else {
+        setTimeout(onEnd, 3000);
+      }
+    }
+  }, [fetchAudioUrl, stopCurrentAudio]);
 
   const fetchBroadcast = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -46,9 +181,13 @@ export default function BroadcastPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.scenes && data.scenes.length > 0) {
+          prunePrefetchedAudio(data.scenes);
           setScenes(data.scenes);
           setCurrentIndex(0);
           setIsPlaying(true);
+          if (data.scenes[0]) {
+            prefetch(data.scenes[0].narration);
+          }
         } else {
           console.warn("No broadcast scenes generated");
         }
@@ -60,26 +199,52 @@ export default function BroadcastPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [prefetch, prunePrefetchedAudio]);
 
-  useEffect(() => {
-    fetchBroadcast();
-    // Pre-load voices for Chrome/Chromium
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.getVoices();
-      };
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWithTimeout = useCallback(async () => {
+    setError(null);
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Request timed out")), 15000)
+    );
+
+    try {
+        await Promise.race([fetchBroadcast(), timeoutPromise]);
+    } catch (e: any) {
+        setError(e.message || "Failed to connect to news engine");
+        setLoading(false);
     }
   }, [fetchBroadcast]);
 
   useEffect(() => {
+    fetchWithTimeout();
+  }, [fetchWithTimeout]);
+
+  useEffect(() => {
+    return () => {
+      stopCurrentAudio();
+
+      for (const objectUrl of prefetchedAudioMap.current.values()) {
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      prefetchedAudioMap.current.clear();
+      inflightAudioMap.current.clear();
+    };
+  }, [stopCurrentAudio]);
+
+  useEffect(() => {
     if (bgMusicRef.current) {
-        bgMusicRef.current.volume = 0.75;
+        // Lower volume for background ambient effect
+        bgMusicRef.current.volume = 0.15;
         if (isPlaying && !loading && musicEnabled) {
             bgMusicRef.current.play().catch(e => {
                 console.warn("Music playback failed", e);
-                // If it fails on first move, it's usually browser policy
+                // Also trigger the blocked overlay if music fails (likely same reason as narration)
+                if (e?.name === "NotAllowedError") {
+                    setIsAudioBlocked(true);
+                }
             });
         } else {
             bgMusicRef.current.pause();
@@ -87,61 +252,38 @@ export default function BroadcastPage() {
     }
   }, [isPlaying, loading, musicEnabled]);
 
-  const speak = useCallback((text: string, onEnd: () => void) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-        onEnd(); // Fallback if no speech API
-        return;
-    }
-    
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Pick a high-quality English voice
-    const voices = window.speechSynthesis.getVoices();
-    const premiumVoice = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha") || (v.lang === "en-US" && v.name.includes("Male")));
-    if (premiumVoice) utterance.voice = premiumVoice;
-    
-    utterance.rate = 1.05; // Slightly faster for energy
-    utterance.pitch = 1.0;
-
-    utterance.onend = () => {
-        onEnd();
-    };
-
-    utterance.onerror = (e) => {
-        console.error("Speech error", e);
-        onEnd(); // Continue even on error
-    };
-    
-    window.speechSynthesis.speak(utterance);
-  }, []);
-
   const next = useCallback(() => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+
     if (currentIndex < scenes.length - 1) {
         setCurrentIndex(prev => prev + 1);
         setProgress(0);
     } else {
-        // Continuous Live Feed: Restart and re-fetch silently
         console.log("[Broadcast] Restarting continuous feed...");
         setCurrentIndex(0);
         setProgress(0);
         setPlaybackKey(prev => prev + 1);
         fetchBroadcast(true); // Silent re-fetch
     }
+    
+    setTimeout(() => { isNavigatingRef.current = false; }, 500);
   }, [currentIndex, scenes.length, fetchBroadcast]);
 
   const prev = useCallback(() => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+
     if (currentIndex > 0) {
         setCurrentIndex(prev => prev - 1);
         setProgress(0);
     }
+
+    setTimeout(() => { isNavigatingRef.current = false; }, 500);
   }, [currentIndex]);
 
   useEffect(() => {
     if (!isPlaying || currentIndex < 0 || currentIndex >= scenes.length) {
-      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
       return;
     }
 
@@ -150,29 +292,58 @@ export default function BroadcastPage() {
 
     expectedIndexRef.current = currentIndex;
 
-    // Trigger voice narration and move to next ONLY when it ends
     speak(currentScene.narration, () => {
-        // Guard: Only proceed if we haven't manually moved to another story
         if (isPlaying && expectedIndexRef.current === currentIndex) {
             next();
         }
     });
 
+    // Prefetch next scene
+    const nextScene = scenes[currentIndex + 1];
+    if (nextScene) {
+      prefetch(nextScene.narration);
+    }
+
     const durationMs = currentScene.duration * 1000;
-    
     const start = Date.now();
     const interval = setInterval(() => {
       const elapsed = Date.now() - start;
-      // We still use currentScene.duration for the progress bar "visual" target
-      // but the actual transition happens on speech end.
       setProgress(Math.min((elapsed / durationMs) * 100, 99));
     }, 50);
 
     return () => {
       clearInterval(interval);
-      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+      stopCurrentAudio();
     };
-  }, [currentIndex, isPlaying, scenes, speak, next, playbackKey]);
+  }, [currentIndex, isPlaying, scenes, speak, next, prefetch, playbackKey, stopCurrentAudio]);
+
+  if (error) {
+    return (
+        <div className="h-screen bg-et-section flex flex-col items-center justify-center text-et-headline p-10 space-y-8">
+            <div className="w-20 h-20 rounded-2xl bg-white border border-et-border shadow-soft flex items-center justify-center">
+                <SignalIcon className="w-10 h-10 text-et-meta" />
+            </div>
+            <div className="text-center space-y-3 max-w-sm">
+                <h2 className="text-2xl font-serif font-black tracking-tight text-et-headline">{error}</h2>
+                <p className="text-sm text-et-secondary leading-relaxed">The news engine is currently re-indexing the latest stories. Please try again in a moment.</p>
+            </div>
+            <div className="flex gap-4">
+                <button 
+                    onClick={() => router.back()}
+                    className="px-6 py-3 rounded-xl border border-et-border font-bold uppercase tracking-widest text-[10px] hover:bg-et-section transition-all"
+                >
+                    Go Back
+                </button>
+                <button 
+                    onClick={() => fetchWithTimeout()}
+                    className="px-8 py-3 rounded-xl bg-et-red text-white font-bold uppercase tracking-widest text-[10px] hover:shadow-lg transition-all active:scale-95"
+                >
+                    Retry Broadcast
+                </button>
+            </div>
+        </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -363,7 +534,7 @@ export default function BroadcastPage() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -5 }}
                             transition={{ duration: 0.4 }}
-                            className="text-lg md:text-2xl font-serif font-black text-et-headline italic leading-snug tracking-tight"
+                            className="text-[9px] md:text-[12px] font-serif font-black text-et-headline italic leading-snug tracking-tight"
                         >
                             "{currentScene?.narration}"
                         </motion.p>
@@ -400,6 +571,43 @@ export default function BroadcastPage() {
             </div>
         </div>
       </div>
+      <AnimatePresence>
+        {isAudioBlocked && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-et-headline/90 backdrop-blur-xl flex items-center justify-center p-6"
+          >
+            <div className="bg-white rounded-[2.5rem] p-10 md:p-12 max-w-md w-full text-center space-y-8 shadow-2xl border border-white/20">
+              <div className="w-24 h-24 bg-et-red/10 rounded-full flex items-center justify-center mx-auto relative">
+                <SpeakerWaveIcon className="w-12 h-12 text-et-red animate-pulse" />
+                <div className="absolute inset-0 rounded-full border-2 border-et-red/20 animate-ping" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-3xl font-serif font-black tracking-tight text-et-headline italic">Ready for Broadcast</h3>
+                <p className="text-sm text-et-secondary leading-relaxed font-medium">To begin the personalized AI news narration with background music, please click the button below.</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsAudioBlocked(false);
+                  setIsPlaying(true);
+                  // Force play music and current audio
+                  if (bgMusicRef.current && musicEnabled) {
+                    bgMusicRef.current.play().catch(console.error);
+                  }
+                  if (currentAudioRef.current) {
+                    currentAudioRef.current.play().catch(console.error);
+                  }
+                }}
+                className="w-full py-5 rounded-2xl bg-et-red text-white font-black uppercase tracking-[0.2em] text-xs hover:shadow-2xl hover:shadow-et-red/30 transition-all active:scale-95 shadow-xl shadow-et-red/20"
+              >
+                Start AI Broadcast
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

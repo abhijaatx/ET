@@ -2,22 +2,51 @@ import { Hono } from "hono";
 import { and, desc, eq, gte, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { articleSignals, articles, stories, userEntityAffinity, userTopicInterests, users } from "@myet/db";
 import { db } from "../db";
-import { authMiddleware } from "../middleware/auth";
+import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth";
 import { getFrame } from "../services/frame";
 import { clamp } from "../utils/engagement";
 import type { AppEnv } from "../types/app";
 
 const feedRoutes = new Hono<AppEnv>();
 
-feedRoutes.get("/feed", authMiddleware, async (c) => {
+feedRoutes.get("/feed", optionalAuthMiddleware, async (c) => {
   const user = c.get("user");
   const offset = Number(c.req.query("offset") ?? 0);
   const limit = Number(c.req.query("limit") ?? 20);
 
+  if (!user) {
+    // PUBLIC ACCESS: No user session, return generic latest feed
+    const latest = await db
+      .select({ article: articles })
+      .from(articles)
+      .innerJoin(stories, eq(articles.storyId, stories.id))
+      .where(eq(stories.briefingStale, false))
+      .orderBy(desc(articles.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const framed = await Promise.all(
+      latest.map(async ({ article }) => ({
+        ...article,
+        publishedAt: article.createdAt.toISOString(),
+        frame: await getFrame({
+          articleId: article.id,
+          summary: article.summary,
+          depthTier: "explainer",
+          fast: true
+        }),
+        isLiked: false,
+        isBookmarked: false
+      }))
+    );
+
+    return c.json({ articles: framed });
+  }
+
   const signalCountResult = await db
     .select({ id: articleSignals.id })
     .from(articleSignals)
-    .where(eq(articleSignals.userId, user!.id));
+    .where(eq(articleSignals.userId, user.id));
   const signalCount = signalCountResult.length;
 
   if (signalCount < 5) {
@@ -48,12 +77,12 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
   const topicInterests = await db
     .select()
     .from(userTopicInterests)
-    .where(eq(userTopicInterests.userId, user!.id));
+    .where(eq(userTopicInterests.userId, user.id));
 
   const entityAffinities = await db
     .select()
     .from(userEntityAffinity)
-    .where(eq(userEntityAffinity.userId, user!.id));
+    .where(eq(userEntityAffinity.userId, user.id));
 
   const topicMap = new Map(
     topicInterests.map((interest) => [interest.topicSlug, interest])
@@ -62,20 +91,20 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
     entityAffinities.map((affinity) => [affinity.entityName, affinity])
   );
 
-  const userResult = await db.select({ embedding: users.embedding }).from(users).where(eq(users.id, user!.id)).limit(1);
+  const userResult = await db.select({ embedding: users.embedding }).from(users).where(eq(users.id, user.id)).limit(1);
   const userEmbedding = userResult[0]?.embedding;
 
   const allInteractedIds = (await db
     .select({ articleId: articleSignals.articleId })
     .from(articleSignals)
-    .where(eq(articleSignals.userId, user!.id))).map(s => s.articleId);
+    .where(eq(articleSignals.userId, user.id))).map(s => s.articleId);
 
   const likedOrSavedIds = (await db
     .select({ articleId: articleSignals.articleId })
     .from(articleSignals)
     .where(
       and(
-        eq(articleSignals.userId, user!.id),
+        eq(articleSignals.userId, user.id),
         or(eq(articleSignals.liked, true), eq(articleSignals.saved, true))
       )
     )).map(s => s.articleId);
@@ -184,7 +213,7 @@ feedRoutes.get("/feed", authMiddleware, async (c) => {
   const signals = await db
     .select()
     .from(articleSignals)
-    .where(and(eq(articleSignals.userId, user!.id), inArray(articleSignals.articleId, articlesWithFrames.map(a => a.id))));
+    .where(and(eq(articleSignals.userId, user.id), inArray(articleSignals.articleId, articlesWithFrames.map(a => a.id))));
   
   const signalsMap = new Map(signals.map(s => [s.articleId, s]));
 
@@ -382,7 +411,7 @@ feedRoutes.get("/feed/search", authMiddleware, async (c) => {
   return c.json({ articles: finalResult });
 });
 
-feedRoutes.get("/feed/trending", authMiddleware, async (c) => {
+feedRoutes.get("/feed/trending", optionalAuthMiddleware, async (c) => {
   const trendingStories = await db
     .select()
     .from(stories)

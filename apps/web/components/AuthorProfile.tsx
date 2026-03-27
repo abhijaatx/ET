@@ -13,6 +13,7 @@ interface Author {
   genres: string[];
   articleCount: number;
   isFollowing: boolean;
+  avatar_url?: string;
 }
 
 interface Article {
@@ -24,6 +25,53 @@ interface Article {
   tags: string[];
 }
 
+const DUMMY_PROFILES: Record<string, Author> = {
+  "rajan-1": {
+    id: "rajan-1",
+    name: "Raghuram Rajan",
+    handle: "RRajan",
+    bio: "Former Governor of the RBI. Economist specializing in financial regulation and economic development.",
+    followersCount: 1250000,
+    genres: ["Economics", "Policy", "Finance"],
+    articleCount: 42,
+    isFollowing: false,
+    avatar_url: "/avatars/rajan.png"
+  },
+  "kotak-1": {
+    id: "kotak-1",
+    name: "Uday Kotak",
+    handle: "ukotak",
+    bio: "Founder and CEO of Kotak Mahindra Bank. Veteran Indian banker and business leader.",
+    followersCount: 850000,
+    genres: ["Banking", "Finance", "Strategy"],
+    articleCount: 15,
+    isFollowing: false,
+    avatar_url: "/avatars/kotak.png"
+  },
+  "shaw-1": {
+    id: "shaw-1",
+    name: "Kiran Mazumdar-Shaw",
+    handle: "kiranshaw",
+    bio: "Executive Chairperson of Biocon. Biotech pioneer and business leader focused on affordable healthcare.",
+    followersCount: 920000,
+    genres: ["Biotech", "Healthcare", "Business"],
+    articleCount: 28,
+    isFollowing: false,
+    avatar_url: "/avatars/shaw.png"
+  },
+  "nilekani-1": {
+    id: "nilekani-1",
+    name: "Nandan Nilekani",
+    handle: "Nilekani",
+    bio: "Co-founder of Infosys. Architect of Aadhaar. Expert in digital public infrastructure and technology.",
+    followersCount: 1100000,
+    genres: ["Technology", "Digital", "Governance"],
+    articleCount: 35,
+    isFollowing: false,
+    avatar_url: "/avatars/nilekani.png"
+  }
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function AuthorProfile({ authorId }: { authorId: string }) {
@@ -34,6 +82,13 @@ export function AuthorProfile({ authorId }: { authorId: string }) {
 
   useEffect(() => {
     async function loadData() {
+      if (DUMMY_PROFILES[authorId]) {
+        setAuthor(DUMMY_PROFILES[authorId]);
+        setArticles([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         const [aRes, fRes] = await Promise.all([
@@ -57,6 +112,16 @@ export function AuthorProfile({ authorId }: { authorId: string }) {
 
   const toggleFollow = async () => {
     if (!author || actionLoading) return;
+
+    if (DUMMY_PROFILES[authorId]) {
+      setAuthor(prev => prev ? {
+        ...prev,
+        isFollowing: !prev.isFollowing,
+        followersCount: !prev.isFollowing ? prev.followersCount + 1 : Math.max(0, prev.followersCount - 1)
+      } : null);
+      return;
+    }
+
     setActionLoading(true);
     try {
       const endpoint = author.isFollowing ? "unfollow" : "follow";
@@ -94,8 +159,12 @@ export function AuthorProfile({ authorId }: { authorId: string }) {
       {/* Profile Header */}
       <div className="bg-white rounded-2xl border border-et-border p-8 shadow-sm">
         <div className="flex items-start gap-6">
-          <div className="w-24 h-24 rounded-full bg-et-section flex items-center justify-center border-2 border-et-border shrink-0">
-            <UserIcon className="w-12 h-12 text-et-meta" />
+          <div className="w-24 h-24 rounded-full bg-et-section flex items-center justify-center border-2 border-et-border shrink-0 overflow-hidden">
+            {author.avatar_url ? (
+              <img src={author.avatar_url} alt={author.name} className="w-full h-full object-cover" />
+            ) : (
+              <UserIcon className="w-12 h-12 text-et-meta" />
+            )}
           </div>
           
           <div className="flex-1 space-y-3">

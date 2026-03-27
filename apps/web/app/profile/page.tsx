@@ -20,6 +20,7 @@ import { Sidebar } from "../../components/Sidebar";
 import { SlideOver } from "../../components/SlideOver";
 import { PremiumAd } from "../../components/PremiumAd";
 import { TopNav } from "../../components/TopNav";
+import { useAuth } from "../../context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -51,8 +52,11 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading || !user) return;
+    
     fetch(`${API_URL}/api/user/stats`, { credentials: "include" })
       .then(res => {
         if (!res.ok) throw new Error("Failed to load profile data");
@@ -61,9 +65,9 @@ export default function ProfilePage() {
       .then(setData)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [authLoading, user]);
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-paper">
         <div className="w-12 h-12 border-4 border-et-divider border-t-et-red rounded-full animate-spin" />
@@ -71,7 +75,58 @@ export default function ProfilePage() {
     );
   }
 
-  if (error) {
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-et-section">
+        <TopNav title="Profile" onMenuClick={() => setIsDrawerOpen(true)} />
+        <SlideOver
+          open={isDrawerOpen}
+          onClose={() => setIsDrawerOpen(false)}
+          title="The EconomicTimes"
+          side="left"
+        >
+          <Sidebar />
+        </SlideOver>
+        
+        <div className="max-w-md mx-auto pt-24 px-6 text-center">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-sm">
+            <UserCircleIcon className="w-12 h-12 text-et-divider" />
+          </div>
+          <h1 className="text-3xl font-serif font-bold text-et-headline mb-4">Your Intelligent News Feed Awaits</h1>
+          <p className="text-et-secondary mb-10 leading-relaxed font-sans">
+            Sign in to access personalized intelligence briefings, follow your favorite authors, and track stories that matter to you.
+          </p>
+          <div className="space-y-4">
+            <Link 
+              href="/login"
+              className="block w-full py-4 bg-et-headline text-white rounded-full font-bold uppercase tracking-widest text-[11px] hover:bg-et-red transition-all shadow-lg shadow-et-red/10"
+            >
+              Sign In to EconomicTimes
+            </Link>
+            <Link 
+              href="/register"
+              className="block w-full py-4 border border-et-divider text-et-headline rounded-full font-bold uppercase tracking-widest text-[11px] hover:bg-et-section transition-all"
+            >
+              Create Free Account
+            </Link>
+          </div>
+          <div className="mt-12 pt-12 border-t border-et-divider">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-et-meta">Experience Premium Intelligence</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <div className="w-12 h-12 border-4 border-et-divider border-t-et-red rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error && user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-paper p-4 text-center">
         <h2 className="text-xl font-bold text-et-headline mb-4">Oops! {error}</h2>
@@ -92,7 +147,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-et-section pb-24 md:pb-0">
-      <TopNav title="Profile" onMenuClick={() => setIsDrawerOpen(true)} />
+      <TopNav title="Profile" onMenuClick={() => setIsDrawerOpen(true)} showLogout={true} />
       
       <SlideOver
         open={isDrawerOpen}

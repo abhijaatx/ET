@@ -30,6 +30,8 @@ const envSchema = z.object({
   GNEWS_KEY: z.string().optional().default(""),
   GROQ_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
+  ELEVENLABS_API_KEY: z.string().min(1).optional(),
+  GROQ_VOICE_API_KEY: z.string().min(1).optional(),
   NEXTAUTH_SECRET: z.string().min(1),
   NEXT_PUBLIC_API_URL: z.string().optional(),
   PORT: z.string().optional().default("3001")

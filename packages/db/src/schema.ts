@@ -76,6 +76,7 @@ export const articles = pgTable(
     imageUrl: text("image_url"),
     embedding: vector("embedding"),
     articleType: text("article_type").notNull(),
+    vernacularCache: jsonb("vernacular_cache").notNull().default({}),
     createdAt: timestamp("created_at").notNull().defaultNow()
   },
   (table) => ({

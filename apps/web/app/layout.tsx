@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 import { AuthorProfileProvider } from "../context/AuthorProfileContext";
+import { AuthProvider } from "../context/AuthContext";
 
 export default function RootLayout({
   children
@@ -19,9 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased bg-et-section font-sans">
-        <AuthorProfileProvider>
-          {children}
-        </AuthorProfileProvider>
+        <AuthProvider>
+          <AuthorProfileProvider>
+            {children}
+          </AuthorProfileProvider>
+        </AuthProvider>
 
         {/* Mobile Navigation */}
         <MobileNav />

@@ -15,6 +15,15 @@ import type { AppEnv } from "../types/app";
 
 const routes = new Hono<AppEnv>();
 
+routes.get("/user/me", authMiddleware, async (c) => {
+  const user = c.get("user");
+  return c.json({ 
+    id: user?.id,
+    email: user?.email,
+    name: user?.email?.split("@")[0] || "Guest"
+  });
+});
+
 routes.get("/user/stats", authMiddleware, async (c) => {
   const user = c.get("user");
   if (!user || !user.id) {

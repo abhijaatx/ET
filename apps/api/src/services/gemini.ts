@@ -2,14 +2,20 @@ import { env } from "../env";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || "");
+function cleanJson(text: string): string {
+  // Remove markdown code blocks if present
+  return text.replace(/```json\n?|```\n?/g, "").trim();
+}
+
 const MODELS = [
-  "gemini-2.0-flash", 
-  "gemini-1.5-flash", 
-  "gemini-flash-latest", 
-  "gemini-flash-lite-latest", 
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-latest",
+  "gemini-2.0-flash",
   "gemini-2.0-flash-lite",
-  "gemma-3-27b-it",
-  "gemini-pro-latest"
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-pro",
+  "gemini-1.5-pro-latest"
 ];
 
 export async function geminiCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
@@ -33,14 +39,12 @@ export async function geminiCompletion(systemPrompt: string, userPrompt: string)
 
       const content = result.response.text();
       if (!content) throw new Error("Gemini API Error: No content returned");
-      return content;
+      return cleanJson(content);
     } catch (err: any) {
       console.error(`[AI] ${modelName} failed:`, err.message);
       lastError = err;
-      // If it's a 429, try next model. Otherwise throw.
-      if (!err.message?.includes("429")) {
-        throw err;
-      }
+      // Continue to next model on any error
+      continue;
     }
   }
 
@@ -85,9 +89,8 @@ export async function streamGeminiCompletion(
     } catch (err: any) {
       console.error(`[AI] Stream with ${modelName} failed:`, err.message);
       lastError = err;
-      if (!err.message?.includes("429")) {
-        throw err;
-      }
+      // Continue to next model on any error
+      continue;
     }
   }
   throw lastError || new Error("All Gemini models failed for streaming");

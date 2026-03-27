@@ -58,12 +58,13 @@ app.route("/api", notificationsRoutes);
 app.route("/api", userRoutes);
 app.route("/api", broadcastRoutes);
 
-scheduleIngest().catch((err: unknown) => {
-  console.error("Failed to schedule ingest", err);
-});
-enqueueImmediateIngest().catch((err: unknown) => {
-  console.error("Failed to enqueue initial ingest", err);
-});
+// Re-pausing ingestion for isolated TTS verification as requested
+// scheduleIngest().catch((err: unknown) => {
+//   console.error("Failed to schedule ingest", err);
+// });
+// enqueueImmediateIngest().catch((err: unknown) => {
+//   console.error("Failed to enqueue initial ingest", err);
+// });
 
 serve({
   fetch: app.fetch,

@@ -12,6 +12,7 @@ interface Author {
   name: string;
   handle: string;
   avatar_url?: string;
+  isFollowing?: boolean;
 }
 
 interface TrendingItem {
@@ -20,6 +21,13 @@ interface TrendingItem {
   topic: string;
   count: string;
 }
+
+const DUMMY_AUTHORS: Author[] = [
+  { id: "rajan-1", name: "Raghuram Rajan", handle: "RRajan", avatar_url: "/avatars/rajan.png" },
+  { id: "kotak-1", name: "Uday Kotak", handle: "ukotak", avatar_url: "/avatars/kotak.png" },
+  { id: "shaw-1", name: "Kiran Mazumdar-Shaw", handle: "kiranshaw", avatar_url: "/avatars/shaw.png" },
+  { id: "nilekani-1", name: "Nandan Nilekani", handle: "Nilekani", avatar_url: "/avatars/nilekani.png" }
+];
 
 export function TrendingSidebar() {
   const { openProfile } = useAuthorProfile();
@@ -39,7 +47,8 @@ export function TrendingSidebar() {
         ]);
         const authorsData = await authorsRes.json();
         const trendingData = await trendingRes.json();
-        setAuthors(authorsData.authors || []);
+        const apiAuthors = authorsData.authors || [];
+        setAuthors(apiAuthors.length > 0 ? [...apiAuthors, ...DUMMY_AUTHORS.slice(0, 3 - apiAuthors.length)] : DUMMY_AUTHORS);
         setTrending(trendingData.trending || []);
       } catch (err) {
         console.error("Failed to fetch sidebar data", err);
@@ -118,8 +127,12 @@ export function TrendingSidebar() {
               className="px-6 py-4 hover:bg-et-section cursor-pointer transition-colors flex items-center gap-4 group"
               onClick={() => openProfile(author.id)}
             >
-              <div className="w-10 h-10 rounded-full bg-et-section flex items-center justify-center font-bold text-et-meta text-xs border border-et-border group-hover:border-et-red transition-colors">
-                {author.name[0]}
+              <div className="w-10 h-10 rounded-full bg-et-section flex items-center justify-center overflow-hidden border border-et-border group-hover:border-et-red transition-colors shrink-0">
+                {author.avatar_url ? (
+                  <img src={author.avatar_url} alt={author.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="font-bold text-et-meta text-xs">{author.name[0]}</span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-[14px] text-et-headline truncate group-hover:text-et-red transition-colors">{author.name}</p>
@@ -128,11 +141,19 @@ export function TrendingSidebar() {
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Follow logic could go here
+                  setAuthors(prev => prev.map(a => 
+                    a.id === author.id ? { ...a, isFollowing: !a.isFollowing } : a
+                  ));
                 }}
-                className="bg-et-headline text-white p-2 rounded-lg hover:bg-et-red transition-all shadow-sm"
+                className={`p-2 rounded-lg transition-all shadow-sm ${
+                  author.isFollowing ? "bg-et-red text-white" : "bg-et-headline text-white hover:bg-et-red"
+                }`}
               >
-                <UserPlusIcon className="w-4 h-4" />
+                {author.isFollowing ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <UserPlusIcon className="w-4 h-4" />
+                )}
               </button>
             </div>
           ))}
@@ -142,12 +163,6 @@ export function TrendingSidebar() {
         </button>
       </div>
 
-      <div className="px-4 text-xs text-et-meta flex flex-wrap gap-x-3 gap-y-1 opacity-70">
-        <span className="hover:underline cursor-pointer">Terms of Service</span>
-        <span className="hover:underline cursor-pointer">Privacy Policy</span>
-        <span className="hover:underline cursor-pointer">Cookie Policy</span>
-        <span>© 2026 News Navigator Inc.</span>
-      </div>
     </div>
   );
 }

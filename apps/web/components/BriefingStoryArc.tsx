@@ -19,6 +19,14 @@ export type StoryArcData = {
   players: { name: string; role: string; stance: string; influence_score: number }[];
   contrarian_views: { perspective: string; source_article_id: string; strength: "moderate" | "significant"; author?: string }[];
   predictions: { scenario: string; probability: string; trigger: string }[];
+  labels?: { 
+    timeline_title: string; 
+    players_title: string; 
+    contrarian_title: string; 
+    outlook_title: string;
+    impact_suffix: string;
+    trigger_label: string;
+  };
 };
 
 interface BriefingStoryArcProps {
@@ -55,7 +63,9 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
             <div className="p-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100 shadow-sm">
               <Clock className="w-4 h-4" />
             </div>
-            <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">Event Horizon</h2>
+            <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">
+              {data.labels?.timeline_title || "Event Horizon"}
+            </h2>
           </div>
         </div>
         
@@ -90,7 +100,7 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
                     item.impact_level === 'high' ? 'bg-red-600 border-red-700 text-white' : 
                     item.impact_level === 'medium' ? 'bg-orange-50 border-orange-100 text-orange-700' : 'bg-slate-50 border-slate-100 text-slate-600'
                   }`}>
-                    {item.impact_level} Impact
+                    {item.impact_level} {data.labels?.impact_suffix || "Impact"}
                   </span>
                   <span className="text-[9px] font-black text-slate-400 group-hover:text-red-600 transition-colors uppercase tracking-widest flex items-center gap-1">
                     ANALYZE SOURCE <ArrowRight className="w-2.5 h-2.5" />
@@ -108,7 +118,9 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
           <div className="p-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100 shadow-sm">
             <Users className="w-4 h-4" />
           </div>
-          <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">Stakeholder Map</h2>
+          <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">
+            {data.labels?.players_title || "Stakeholder Map"}
+          </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.players.sort((a,b) => b.influence_score - a.influence_score).map((player, idx) => (
@@ -142,7 +154,9 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
             <div className="p-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100 shadow-sm">
               <AlertTriangle className="w-4 h-4" />
             </div>
-            <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">Contrarian Views</h2>
+            <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">
+              {data.labels?.contrarian_title || "Contrarian Views"}
+            </h2>
           </div>
           <div className="space-y-4">
             {data.contrarian_views.map((c, idx) => (
@@ -178,7 +192,9 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
             <div className="p-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100 shadow-sm">
               <Zap className="w-4 h-4 fill-red-600" />
             </div>
-            <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">Forward Outlook</h2>
+            <h2 className="text-lg md:text-xl font-black tracking-tight text-slate-900 uppercase">
+              {data.labels?.outlook_title || "Forward Outlook"}
+            </h2>
           </div>
           <div className="grid grid-cols-1 gap-4">
             {data.predictions.map((p, idx) => (
@@ -207,7 +223,7 @@ export function BriefingStoryArc({ data, onArticleClick }: BriefingStoryArcProps
                         className="w-2 h-2 rounded-full bg-red-600 shadow-[0_0_8px_rgba(226,27,34,0.3)]" 
                        />
                        <span className="text-[9px] font-black uppercase tracking-widest text-red-600 flex items-center gap-1">
-                         Critical Trigger <Info className="w-2.5 h-2.5" />
+                         {data.labels?.trigger_label || "Critical Trigger"} <Info className="w-2.5 h-2.5" />
                        </span>
                     </div>
                     <p className="text-xs text-slate-700 font-bold leading-normal">{p.trigger}</p>

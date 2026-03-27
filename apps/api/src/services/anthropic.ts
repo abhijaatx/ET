@@ -40,7 +40,9 @@ function cleanJson(text: string): string {
 }
 
 const MODELS = [
-  "llama-3.1-8b-instant"
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "mixtral-8x7b-32768"
 ];
 
 export async function groqCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
@@ -65,13 +67,14 @@ export async function groqCompletion(systemPrompt: string, userPrompt: string): 
         return cleanJson(chatCompletion.choices[0]?.message?.content || "");
       } catch (error: any) {
         lastError = error;
-        // If it's a rate limit error (429), try the next model and set a longer cooldown
+        // Continue to next model on any error
         if (error?.status === 429) {
           console.warn(`[AI] Model ${model} rate limited (429). Pausing for 2 mins...`);
           pauseUntil = Date.now() + 120 * 1000;
-          continue;
+        } else {
+          console.error(`[AI] ${model} failed:`, error.message);
         }
-        throw error;
+        continue;
       }
     }
     throw lastError;
@@ -126,9 +129,10 @@ export async function streamGroqCompletion(
         if (error?.status === 429) {
           console.warn(`[AI] Model ${model} rate limited (429) during stream. Pausing for 2 mins...`);
           pauseUntil = Date.now() + 120 * 1000;
-          continue;
+        } else {
+          console.error(`[AI] Stream with ${model} failed:`, error.message);
         }
-        throw error;
+        continue;
       }
     }
     throw lastError;

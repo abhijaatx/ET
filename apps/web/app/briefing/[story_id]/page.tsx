@@ -12,6 +12,8 @@ import { useAuthorProfile } from "../../../context/AuthorProfileContext";
 import { PremiumAd } from "../../../components/PremiumAd";
 import { BriefingStoryArc, type StoryArcData } from "../../../components/BriefingStoryArc";
 import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star, Globe, X } from "lucide-react";
+import { useAuth } from "../../../context/AuthContext";
+import { useRouter } from "next/navigation";
 
 const STOCK_PHOTO = "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
 
@@ -36,6 +38,7 @@ type ArticleItem = {
   author: string | null;
   authorId: string | null;
   published_at: string | null;
+  vernacularCache?: Record<string, { title: string; content: string }>;
 };
 
 const container = {
@@ -55,6 +58,8 @@ const item = {
 
 export default function BriefingPage() {
   const { openProfile } = useAuthorProfile();
+  const { user } = useAuth();
+  const router = useRouter();
   const params = useParams<{ story_id: string }>();
   const searchParams = useSearchParams();
   const storyId = params.story_id;
@@ -79,24 +84,37 @@ export default function BriefingPage() {
   const [isLanguageDrawerOpen, setIsLanguageDrawerOpen] = useState(false);
   const [isAppDrawerOpen, setIsAppDrawerOpen] = useState(false);
   const [vernacularBriefing, setVernacularBriefing] = useState<BriefingDocument | null>(null);
+  const [vernacularStoryArc, setVernacularStoryArc] = useState<StoryArcData | null>(null);
+  const [vernacularArticles, setVernacularArticles] = useState<Record<string, { title: string; content: string }>>({});
   const [isTranslating, setIsTranslating] = useState(false);
+  const [articleTranslatingId, setArticleTranslatingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentLanguage === "en") {
       setVernacularBriefing(null);
+      setVernacularStoryArc(null);
+      setVernacularArticles({});
       return;
     }
 
     const fetchVernacular = async () => {
       setIsTranslating(true);
       try {
-        const res = await fetch(`/api/briefing/${storyId}/vernacular/${currentLanguage}`, { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
+        // Fetch Briefing
+        const briefingRes = await fetch(`/api/briefing/${storyId}/vernacular/${currentLanguage}`, { credentials: "include" });
+        if (briefingRes.ok) {
+          const data = await briefingRes.json();
           setVernacularBriefing(data);
         }
+
+        // Fetch Story Arc
+        const arcRes = await fetch(`/api/story-arc/${storyId}/vernacular/${currentLanguage}`, { credentials: "include" });
+        if (arcRes.ok) {
+          const data = await arcRes.json();
+          setVernacularStoryArc(data);
+        }
       } catch (e) {
-        console.error("Failed to fetch vernacular:", e);
+        console.error("Failed to fetch vernacular content:", e);
       } finally {
         setIsTranslating(false);
       }
@@ -120,6 +138,10 @@ export default function BriefingPage() {
   }, [storyId]);
 
   const toggleFollow = async () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     setFollowLoading(true);
     try {
       const method = isFollowed ? "DELETE" : "POST";
@@ -172,6 +194,33 @@ export default function BriefingPage() {
     };
     fetchArticles();
   }, [storyId, sourceId]);
+
+  // Handle Article Translation
+  useEffect(() => {
+    if (currentLanguage === "en" || !activeSource) return;
+    
+    const cacheKey = `${activeSource.id}_${currentLanguage}`;
+    if (vernacularArticles[cacheKey]) return;
+
+    const translate = async () => {
+      setArticleTranslatingId(activeSource.id);
+      try {
+        const res = await fetch(`/api/articles/${activeSource.id}/vernacular/${currentLanguage}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setVernacularArticles(prev => ({
+            ...prev,
+            [cacheKey]: data
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to translate article:", e);
+      } finally {
+        setArticleTranslatingId(null);
+      }
+    };
+    translate();
+  }, [activeSource, currentLanguage, vernacularArticles]);
 
   useEffect(() => {
     const fetchBriefing = async () => {
@@ -247,7 +296,7 @@ export default function BriefingPage() {
 
   // Focus Time Tracking (Heartbeat)
   useEffect(() => {
-    if (!storyId) return;
+    if (!storyId || !user) return;
 
     const interval = setInterval(() => {
       const targetArticleId = sourceId || briefing?.source_articles?.[0]?.id || articles?.[0]?.id;
@@ -280,7 +329,7 @@ export default function BriefingPage() {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <TopNav title="Intelligence Brief" onMenuClick={() => setIsAppDrawerOpen(true)} />
+            <TopNav title="Intelligence Brief" onMenuClick={() => setIsAppDrawerOpen(true)} hideAuthInfo={true} />
             <button
               onClick={() => setIsLanguageDrawerOpen(true)}
               className="p-2 rounded-full hover:bg-mist/10 transition-all text-slate/40 hover:text-et-red group relative"
@@ -426,14 +475,14 @@ export default function BriefingPage() {
                       </div>
                     ) : (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="my-auto mx-auto max-w-4xl w-full">
-                        {storyArc ? (
+                        {(vernacularStoryArc || storyArc) ? (
                           <BriefingStoryArc data={{
-                            ...storyArc,
-                            timeline: storyArc.timeline.map(item => ({
+                            ...(vernacularStoryArc || storyArc)!,
+                            timeline: (vernacularStoryArc || storyArc)!.timeline.map(item => ({
                               ...item,
                               author: articles.find(a => a.id === item.article_id)?.author || undefined
                             })),
-                            contrarian_views: storyArc.contrarian_views.map(item => ({
+                            contrarian_views: (vernacularStoryArc || storyArc)!.contrarian_views.map(item => ({
                               ...item,
                               author: articles.find(a => a.id === item.source_article_id)?.author || undefined
                             }))
@@ -477,8 +526,12 @@ export default function BriefingPage() {
             <div className="space-y-8 pb-12">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-et-red">Primary Source</span>
-                  <h2 className="text-2xl md:text-3xl font-display leading-tight">{activeSource.title}</h2>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-et-red">
+                    {articleTranslatingId === activeSource.id ? "Translating Source..." : "Primary Source"}
+                  </span>
+                  <h2 className="text-2xl md:text-3xl font-display leading-tight">
+                    {vernacularArticles[`${activeSource.id}_${currentLanguage}`]?.title || activeSource.title}
+                  </h2>
                   {activeSource.author && (
                     <p className="text-[10px] font-bold uppercase tracking-widest text-ink/40 mt-1">BY {activeSource.author}</p>
                   )}
@@ -486,29 +539,21 @@ export default function BriefingPage() {
                 <button onClick={() => setActiveSource(null)} className="w-10 h-10 shrink-0 rounded-full bg-white border border-mist flex items-center justify-center hover:bg-et-red hover:text-white transition-all">✕</button>
               </div>
               <div className="rounded-3xl md:rounded-[2.5rem] bg-white border border-mist p-6 md:p-10 shadow-soft overflow-y-auto no-scrollbar font-serif text-lg leading-relaxed text-ink/90">
-                {activeSource.content.split("\n\n").map((p, i) => <p key={i} className="mb-6">{p}</p>)}
-                <div className="mt-12 pt-6 border-t border-mist/50">
-                  <a href={activeSource.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold uppercase tracking-[0.4em] text-et-red hover:underline">ACCESS JOURNAL ORIGIN →</a>
-                </div>
+                {articleTranslatingId === activeSource.id ? (
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-4 bg-mist/20 rounded w-full" />
+                    <div className="h-4 bg-mist/20 rounded w-5/6" />
+                    <div className="h-4 bg-mist/20 rounded w-4/5" />
+                  </div>
+                ) : (
+                  (vernacularArticles[`${activeSource.id}_${currentLanguage}`]?.content || activeSource.content)
+                    .split("\n\n").map((p, i) => <p key={i} className="mb-6">{p}</p>)
+                )}
               </div>
             </div>
           ) : (
             <div className="space-y-6">
               <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-slate/30 text-center">Reference Coverage</p>
-              {(vernacularBriefing || briefing)?.suggested_questions && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(vernacularBriefing || briefing)?.suggested_questions.map((q, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => setInput(q)}
-                      className="p-4 rounded-xl border border-mist hover:border-et-red hover:bg-et-red/5 text-left text-sm font-bold transition-all group"
-                    >
-                      <span className="opacity-40 mr-2 group-hover:text-et-red">0{i+1}</span>
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
               <div className="grid gap-3">
                 {articles.map((a) => (
                   <button key={a.id} onClick={() => setActiveSource(a)} className="w-full text-left p-6 rounded-3xl border border-mist bg-white/60 hover:bg-white hover:shadow-soft transition-all group">

@@ -26,6 +26,8 @@ export async function getLatestBroadcast() {
       )
       .orderBy(desc(stories.latestArticleAt));
 
+    console.log(`[Broadcast] Found ${todayStories.length} stories for today.`);
+
     // Fallback if no stories today yet
     let pool = todayStories;
     if (pool.length === 0) {
@@ -93,11 +95,31 @@ export async function getLatestBroadcast() {
       };
     }).filter(scene => scene.narration.length > 50); // Filter out empty or placeholder briefings
 
+    if (scenes.length === 0) {
+      return [{
+        id: "placeholder",
+        duration: 10,
+        narration: "Welcome to the AI News Broadcaster. We are currently curating the latest financial insights for you. Please stay tuned as we finalize today's top stories.",
+        visualType: "breaking_news",
+        overlayTitle: "Curating Latest Stories",
+        overlayBullets: ["Live Analysis In Progress", "Real-time Data Fetching", "Executive Intelligence Briefing"],
+        imageUrl: "https://images.pexels.com/photos/3183197/pexels-photo-3183197.jpeg"
+      }];
+    }
+
     console.log(`[Broadcast] Generated ${scenes.length} scenes directly from DB.`);
     return scenes;
   } catch (err) {
     console.error("[Broadcast] Direct mapping error:", err);
-    return [];
+    return [{
+      id: "error-fallback",
+      duration: 10,
+      narration: "We are currently experiencing a brief synchronization delay with our news feed. Our AI producer is working to restore the live stream shortly.",
+      visualType: "breaking_news",
+      overlayTitle: "System Synchronization",
+      overlayBullets: ["Connection Optimizing", "Feed Restoring", "Please Wait..."],
+      imageUrl: "https://images.pexels.com/photos/3748221/pexels-photo-3748221.jpeg"
+    }];
   }
 }
 

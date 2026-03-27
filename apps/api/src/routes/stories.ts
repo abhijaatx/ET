@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { stories, userStoryFollows } from "@myet/db";
 import { db } from "../db";
-import { authMiddleware } from "../middleware/auth";
+import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth";
 import type { AppEnv } from "../types/app";
 
 const storiesRoutes = new Hono<AppEnv>();
 
-storiesRoutes.get("/stories", authMiddleware, async (c) => {
+storiesRoutes.get("/stories", optionalAuthMiddleware, async (c) => {
   const list = await db
     .select()
     .from(stories)

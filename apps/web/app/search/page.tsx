@@ -7,6 +7,7 @@ import { Sidebar } from "../../components/Sidebar";
 import { TrendingSidebar } from "../../components/TrendingSidebar";
 import { SlideOver } from "../../components/SlideOver";
 import { Bars3Icon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { SidebarFooter } from "../../components/SidebarFooter";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -99,8 +100,9 @@ export default function SearchPage() {
            </div>
         </main>
 
-        <aside className="hidden xl:block w-80">
+        <aside className="hidden xl:block w-80 space-y-8">
           <TrendingSidebar />
+          <SidebarFooter />
         </aside>
       </div>
     </div>

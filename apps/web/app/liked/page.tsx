@@ -9,6 +9,7 @@ import { TrendingSidebar } from "../../components/TrendingSidebar";
 import { Bars3Icon, CalendarDaysIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { Calendar } from "../../components/Calendar";
+import { SidebarFooter } from "../../components/SidebarFooter";
 
 type FeedArticle = {
   id: string;
@@ -303,8 +304,9 @@ export default function LikedPage() {
           ) : null}
         </main>
 
-        <aside className="hidden lg:block w-[350px] flex-shrink-0 px-4 h-screen sticky top-0 overflow-y-auto no-scrollbar">
+        <aside className="hidden lg:block w-[350px] flex-shrink-0 px-4 h-screen sticky top-0 overflow-y-auto no-scrollbar space-y-8 pb-10">
           <TrendingSidebar />
+          <SidebarFooter />
         </aside>
       </div>
 

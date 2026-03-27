@@ -8,6 +8,22 @@ export type VernacularBriefing = {
   suggested_questions: string[];
 };
 
+export type VernacularStoryArc = {
+  story_id: string;
+  timeline: { date: string; event: string; article_id: string; impact_level: "low" | "medium" | "high" }[];
+  players: { name: string; role: string; stance: string; influence_score: number }[];
+  contrarian_views: { perspective: string; source_article_id: string; strength: "moderate" | "significant" }[];
+  predictions: { scenario: string; probability: string; trigger: string }[];
+  labels: { 
+    timeline_title: string; 
+    players_title: string; 
+    contrarian_title: string; 
+    outlook_title: string;
+    impact_suffix: string;
+    trigger_label: string;
+  };
+};
+
 const LANGUAGE_META: Record<string, { name: string; context: string }> = {
   hi: { 
     name: "Hindi", 
@@ -60,4 +76,64 @@ Adapt this briefing into ${meta.name}. Re-contextualize the business implication
   const vernacular = JSON.parse(text);
 
   return vernacular as VernacularBriefing;
+}
+
+export async function generateVernacularStoryArc(params: {
+  storyId: string;
+  lang: string;
+  englishArc: any;
+}) {
+  const meta = LANGUAGE_META[params.lang];
+  if (!meta) throw new Error(`Unsupported language: ${params.lang}`);
+
+  const systemPrompt = `You are a specialist cultural business correspondent for The Economic Times, expert in translating complex global and Indian economic trends for a ${meta.name} audience.
+
+Your goal is to provide a "Context-Aware Transcreation" of the provided English Story Arc. 
+
+Guidelines:
+1. Culture-Awareness: Adapt the business implications for the ${meta.name} context.
+2. Local Context: ${meta.context}
+3. Structure: Maintain the original JSON structure.
+4. Language: Translate ALL text values into ${meta.name}.
+5. Labels: Provide translated labels for the UI.
+6. Return ONLY valid JSON with keys:
+   - story_id
+   - timeline: Array of { date, event (translated), article_id, impact_level }
+   - players: Array of { name, role (translated), stance (translated), influence_score }
+   - contrarian_views: Array of { perspective (translated), source_article_id, strength }
+   - predictions: Array of { scenario (translated), probability (translated), trigger (translated) }
+   - labels: { timeline_title, players_title, contrarian_title, outlook_title, impact_suffix, trigger_label }`;
+
+  const userPrompt = `English Story Arc to Adapt:
+${JSON.stringify(params.englishArc, null, 2)}
+
+Adapt this story arc into ${meta.name}.`;
+
+  const text = await googleCompletion(systemPrompt, userPrompt);
+  const vernacular = JSON.parse(text);
+
+  return vernacular as VernacularStoryArc;
+}
+
+export async function translateArticle(params: {
+  lang: string;
+  title: string;
+  content: string;
+}) {
+  const meta = LANGUAGE_META[params.lang];
+  if (!meta) throw new Error(`Unsupported language: ${params.lang}`);
+
+  const systemPrompt = `You are a professional business translator for The Economic Times. 
+Translate the following article into ${meta.name}.
+Maintain a professional, journalistic tone. 
+Ensure financial terms are accurately translated or explained in context.
+Return the translated title and content.
+Return ONLY valid JSON with keys: title, content.`;
+
+  const userPrompt = `Title: ${params.title}\n\nContent: ${params.content}`;
+
+  const text = await googleCompletion(systemPrompt, userPrompt);
+  const vernacular = JSON.parse(text);
+
+  return vernacular as { title: string; content: string };
 }

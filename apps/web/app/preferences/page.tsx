@@ -120,7 +120,7 @@ export default function PreferencesPage() {
 
   return (
     <div className="min-h-screen bg-et-section pb-24 md:pb-0">
-      <TopNav title="Preferences" onMenuClick={() => setIsDrawerOpen(true)} />
+      <TopNav title="Preferences" onMenuClick={() => setIsDrawerOpen(true)} hideAuthInfo={true} />
       
       <SlideOver
         open={isDrawerOpen}

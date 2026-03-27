@@ -9,6 +9,8 @@ import { TrendingSidebar } from "../components/TrendingSidebar";
 import { Bars3Icon, HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { PremiumAd } from "../components/PremiumAd";
+import { TopNav } from "../components/TopNav";
+import { SidebarFooter } from "../components/SidebarFooter";
 
 type FeedArticle = {
   id: string;
@@ -75,8 +77,9 @@ export default function FeedPage() {
           credentials: "include"
         }
       );
-      if (res.status === 401) {
-        router.push("/login");
+      if (res.status === 401 && reset) {
+        // If it's a reset and we're totally barred, maybe go to login, 
+        // but for now let's just let it be handled by the API (which now allows public)
         setLoading(false);
         return;
       }
@@ -147,24 +150,30 @@ export default function FeedPage() {
 
   const sendSignal = async (openedBriefingOverride?: boolean) => {
     if (!activeArticle) return;
+    
+    // AUTH GUARD: Only send signals if logged in (to prevent console noise)
     const timeSpentS = openedAt
       ? Math.max(1, Math.round((Date.now() - openedAt) / 1000))
       : 0;
 
-    await fetch(`${API_URL}/api/signals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        article_id: activeArticle.id,
-        time_spent_s: timeSpentS,
-        scroll_depth: scrollDepth,
-        opened_briefing: openedBriefingOverride ?? openedBriefing,
-        shared,
-        saved,
-        liked
-      })
-    });
+    try {
+      await fetch(`${API_URL}/api/signals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          article_id: activeArticle.id,
+          time_spent_s: timeSpentS,
+          scroll_depth: scrollDepth,
+          opened_briefing: openedBriefingOverride ?? openedBriefing,
+          shared,
+          saved,
+          liked
+        })
+      });
+    } catch (e) {
+      console.warn("Signal failed (probably anonymous)");
+    }
   };
 
   const handleClose = async () => {
@@ -226,7 +235,7 @@ export default function FeedPage() {
     );
   }, [articles, selectedTopic]);
 
-  const topics = ["All", "Business", "Technology", "World", "Finance", "Markets", "Policy"];
+  const topics = ["All", "Business", "Technology", "World", "Markets", "Policy"];
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -244,16 +253,8 @@ export default function FeedPage() {
       <div className="w-full flex bg-paper">
         {/* Main Feed */}
         <main className="flex-1 min-w-0 border-r border-et-border bg-paper">
-          <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-et-border">
-            <div className="px-4 py-3 flex items-center gap-4">
-              <button 
-                onClick={() => setIsDrawerOpen(true)}
-                className="p-2 hover:bg-et-section rounded-full transition-colors text-et-headline"
-              >
-                <Bars3Icon className="w-6 h-6" />
-              </button>
-              <h1 className="text-xl font-bold font-serif tracking-tight text-et-headline">Home</h1>
-            </div>
+          <TopNav title="Home" onMenuClick={() => setIsDrawerOpen(true)} hideAuthInfo={true} />
+          <header className="sticky top-[64px] z-10 bg-white/95 backdrop-blur-md border-b border-et-border">
             <div className="flex overflow-x-auto no-scrollbar border-b border-et-border bg-et-section pl-2 md:pl-16 pr-4">
               {topics.map((topic) => (
                 <button
@@ -297,6 +298,7 @@ export default function FeedPage() {
         <aside className="hidden lg:block w-[350px] flex-shrink-0 px-4 h-screen sticky top-0 overflow-y-auto no-scrollbar pb-10 space-y-8">
           <TrendingSidebar />
           <PremiumAd variant="sidebar" className="mt-8" />
+          <SidebarFooter />
         </aside>
       </div>
 
