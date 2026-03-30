@@ -23,16 +23,16 @@ if (!loaded) {
 }
 
 const envSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().min(1),
+  ANTHROPIC_API_KEY: z.string().optional().default(""),
   DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().min(1),
+  REDIS_URL: z.string().optional().default(""),
   NEWSAPI_KEY: z.string().optional().default(""),
   GNEWS_KEY: z.string().optional().default(""),
   NVIDIA_API_KEY: z.string().min(1),
-  GROQ_API_KEY: z.string().min(1).optional(),
-  GEMINI_API_KEY: z.string().min(1).optional(),
-  ELEVENLABS_API_KEY: z.string().min(1).optional(),
-  GROQ_VOICE_API_KEY: z.string().min(1).optional(),
+  GROQ_API_KEY: z.string().optional().default(""),
+  GEMINI_API_KEY: z.string().optional().default(""),
+  ELEVENLABS_API_KEY: z.string().optional().default(""),
+  GROQ_VOICE_API_KEY: z.string().optional().default(""),
   NEXTAUTH_SECRET: z.string().min(1),
   NEXT_PUBLIC_API_URL: z.string().optional(),
   PORT: z.string().optional().default("3001")
