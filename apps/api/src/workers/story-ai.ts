@@ -23,6 +23,11 @@ export const storyAIWorker = new Worker(
     }
 
     try {
+      // Create a heartbeat thunk that BullMQ understands
+      const onHeartbeat = async () => {
+        await job.updateProgress(10); // Ping to refresh lock
+      };
+
       // 1. Generate Briefing
       console.log(`[Story AI] Generating briefing for ${storyId}...`);
       const briefing = await generateBriefing({
@@ -36,7 +41,7 @@ export const storyAIWorker = new Worker(
           author: article.author,
           publishedAt: article.publishedAt
         }))
-      });
+      }, onHeartbeat);
 
       // Enriched briefing with full content for frontend
       const enrichedBriefing = {
@@ -60,7 +65,7 @@ export const storyAIWorker = new Worker(
           summary: (a.content ?? "").slice(0, 1000),
           publishedAt: a.publishedAt,
         })),
-      });
+      }, onHeartbeat);
 
       // 3. Update Stories Table
       await db
@@ -81,7 +86,9 @@ export const storyAIWorker = new Worker(
   },
   {
     connection: redis as any,
-    concurrency: 2 // Limit parallel AI calls
+    concurrency: 2, // Limit parallel AI calls
+    lockDuration: 3600000, // 1 hour (allow for long AI queues)
+    stalledInterval: 60000, // 1 minute
   }
 );
 

@@ -1,13 +1,5 @@
 import { env } from "../env";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || "");
-const MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-latest",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-];
+import { MODEL, callNvidia, callNvidiaFast, nvidia, setPause, extractJson } from "./nvidia_client";
 
 export type GeminiCompletionOptions = {
   preferredModels?: string[];
@@ -16,113 +8,128 @@ export type GeminiCompletionOptions = {
   maxOutputTokens?: number;
 };
 
-function cleanJson(text: string): string {
-  // Extract content between first { and last }
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) {
-    return text.substring(start, end + 1);
+/**
+ * Normalizes messages for NVIDIA by merging the first system message into the first user message,
+ * as the NVIDIA Gemma-2-27B endpoint does not support the 'system' role.
+ */
+function normalizeMessages(messages: any[]) {
+  const result = [...messages];
+  const firstSystemIndex = result.findIndex(m => m.role === "system");
+  
+  if (firstSystemIndex !== -1) {
+    const systemContent = result[firstSystemIndex].content;
+    result.splice(firstSystemIndex, 1);
+    
+    const firstUserIndex = result.findIndex(m => m.role === "user");
+    if (firstUserIndex !== -1) {
+      result[firstUserIndex].content = `Instruction: ${systemContent}\n\nTask: ${result[firstUserIndex].content}`;
+    } else {
+      // Add as user message if no user message exists
+      result.unshift({ role: "user", content: systemContent });
+    }
   }
-  // Fallback for markdown code blocks
-  return text.replace(/```json\n?|```\n?/g, "").trim();
+  
+  return result.filter(m => m.role !== "system");
 }
 
+/**
+ * Unified geminiCompletion now uses the shared callNvidia wrapper for global rate limiting.
+ */
 export async function geminiCompletion(
   systemPrompt: string,
   userPrompt: string,
-  options: GeminiCompletionOptions = {}
+  options: GeminiCompletionOptions = {},
+  onHeartbeat?: () => Promise<void>
 ): Promise<string> {
-  if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");
+  if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA_API_KEY is missing");
 
-  let lastError: any = null;
-  const modelsToTry = options.preferredModels?.length
-    ? [...options.preferredModels, ...MODELS.filter((model) => !options.preferredModels?.includes(model))]
-    : MODELS;
+  // Use the fast user-facing queue (not blocked by background ingestion)
+  return await callNvidiaFast(async () => {
+    try {
+      console.log(`[AI-Gemini] Using NVIDIA (${MODEL})...`);
 
-  for (const modelName of modelsToTry) {
-    let retryCount = 0;
-    const maxRetries = 2;
+      const jsonInstruction = options.responseMimeType === "application/json"
+        ? "\n\nIMPORTANT: You MUST return ONLY valid JSON. No markdown, no explanation, no code blocks. Start your response with { and end with }."
+        : "";
 
-    while (retryCount <= maxRetries) {
-      try {
-        console.log(`[AI] Attempting completion with ${modelName} (Retry: ${retryCount})...`);
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent({
-          contents: [
-            { role: "user", parts: [{ text: `SYSTEM: ${systemPrompt}\n\nUSER: ${userPrompt}` }] }
-          ],
-          generationConfig: {
-            temperature: options.temperature ?? 0.3,
-            maxOutputTokens: options.maxOutputTokens ?? 4096,
-            ...(options.responseMimeType ? { responseMimeType: options.responseMimeType } : {}),
-          }
-        });
+      const messages = normalizeMessages([
+        { role: "system", content: systemPrompt + jsonInstruction },
+        { role: "user", content: userPrompt }
+      ]);
 
-        const content = result.response.text();
-        if (!content) throw new Error("Gemini API Error: No content returned");
-        return cleanJson(content);
-      } catch (err: any) {
-        lastError = err;
-        const status = err.status || (err.response ? err.response.status : null);
+      const chatCompletion = await nvidia.chat.completions.create({
+        messages: messages,
+        model: MODEL,
+        temperature: options.temperature ?? 0.2,
+        top_p: 0.7,
+        max_tokens: options.maxOutputTokens ?? 4096,
+      });
 
-        if (status === 429 && retryCount < maxRetries) {
-          const waitTime = Math.pow(2, retryCount) * 2000 + Math.random() * 1000;
-          console.warn(`[AI] ${modelName} rate limited (429). Retrying in ${Math.round(waitTime)}ms...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          retryCount++;
-          continue;
-        }
-
-        console.error(`[AI] ${modelName} failed:`, err.message);
-        break; // Try next model
+      const content = chatCompletion.choices[0]?.message?.content;
+      if (!content) throw new Error("NVIDIA API Error: No content returned");
+      return extractJson(content);
+    } catch (err: any) {
+      if (err.status === 429) {
+        setPause(120 * 1000);
+      } else {
+        console.error(`[AI-Gemini] NVIDIA ${MODEL} failed:`, err.message);
       }
+      throw err;
     }
-  }
-
-  throw lastError || new Error("All Gemini models failed");
+  });
 }
 
+/**
+ * Unified streamGeminiCompletion now uses the shared callNvidia wrapper for global rate limiting.
+ */
 export async function streamGeminiCompletion(
   systemPrompt: string,
   userPrompt: string,
   history: { role: "user" | "assistant", content: string }[],
   onToken: (token: string) => Promise<void> | void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onHeartbeat?: () => Promise<void>
 ) {
-  if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");
+  if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA_API_KEY is missing");
 
-  let lastError: any = null;
-  for (const modelName of MODELS) {
+  // Stream also uses the fast lane for interactive use
+  return await callNvidiaFast(async () => {
     try {
-      console.log(`[AI] Attempting stream with ${modelName}...`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const chat = model.startChat({
-        history: [
-          { role: "user", parts: [{ text: `System instruction: ${systemPrompt}` }] },
-          { role: "model", parts: [{ text: "Understood. I will follow those instructions." }] },
-          ...history.map(h => ({
-            role: h.role === "user" ? "user" : "model" as any,
-            parts: [{ text: h.content }]
-          }))
-        ]
+      console.log(`[AI-Gemini] Streaming NVIDIA (${MODEL})...`);
+
+      const messages = normalizeMessages([
+        { role: "system", content: systemPrompt },
+        ...history.map(h => ({
+          role: h.role as "user" | "assistant",
+          content: h.content
+        })),
+        { role: "user", content: userPrompt }
+      ]);
+
+      const stream = await nvidia.chat.completions.create({
+        messages: messages,
+        model: MODEL,
+        temperature: 0.2,
+        top_p: 0.7,
+        max_tokens: 4096,
+        stream: true,
       });
 
-      const result = await chat.sendMessageStream(userPrompt);
-
-      for await (const chunk of result.stream) {
+      for await (const chunk of stream) {
         if (signal?.aborted) throw new Error("Aborted");
-        const text = chunk.text();
+        const text = chunk.choices[0]?.delta?.content || "";
         if (text) {
           await onToken(text);
         }
       }
       return; // Success
     } catch (err: any) {
-      console.error(`[AI] Stream with ${modelName} failed:`, err.message);
-      lastError = err;
-      // Continue to next model on any error
-      continue;
+      if (err.status === 429) {
+        setPause(120 * 1000);
+      } else {
+        console.error(`[AI-Gemini] NVIDIA stream failed:`, err.message);
+      }
+      throw err;
     }
-  }
-  throw lastError || new Error("All Gemini models failed for streaming");
+  });
 }

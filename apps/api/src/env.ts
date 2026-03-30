@@ -28,6 +28,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1),
   NEWSAPI_KEY: z.string().optional().default(""),
   GNEWS_KEY: z.string().optional().default(""),
+  NVIDIA_API_KEY: z.string().min(1),
   GROQ_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_API_KEY: z.string().min(1).optional(),

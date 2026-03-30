@@ -22,6 +22,7 @@ interface TrendingItem {
   topic: string;
   count: string;
   latestArticleAt?: string;
+  imageUrl?: string | null;
 }
 
 function formatTime(value?: string) {
@@ -149,8 +150,8 @@ export default function ExplorePage() {
                   >
                     <div className="relative overflow-hidden bg-et-section rounded-[32px] border border-et-border aspect-[16/9] shadow-xl">
                       <SafeImage 
-                        src={STOCK_PHOTO} 
-                        alt="Hero" 
+                        src={heroItem.imageUrl ?? STOCK_PHOTO} 
+                        alt={heroItem.topic} 
                         className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-1000 ease-out"
                       />
                       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
@@ -202,8 +203,8 @@ export default function ExplorePage() {
                         </div>
                         <div className="w-24 h-24 bg-et-section rounded-2xl overflow-hidden shadow-md border border-et-border flex-shrink-0">
                           <SafeImage 
-                            src={mediaFallbacks[i % mediaFallbacks.length]} 
-                            alt="Thumb" 
+                            src={item.imageUrl ?? mediaFallbacks[i % mediaFallbacks.length]} 
+                            alt={item.topic} 
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         </div>

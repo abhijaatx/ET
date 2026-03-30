@@ -566,7 +566,22 @@ export default function BriefingPage() {
                     )}
                   </motion.div>
                 ) : (
-                  <div className="py-20 text-center animate-pulse font-bold text-slate/20">LOADING BRIEFING...</div>
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="py-20 flex flex-col items-center justify-center gap-6 text-center"
+                  >
+                    <div className="flex gap-2">
+                      <span className="w-2 h-2 rounded-full bg-et-red/30 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 rounded-full bg-et-red/30 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 rounded-full bg-et-red/30 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-et-red/60 mb-2">AI Processing</p>
+                      <p className="text-sm text-slate/40 font-serif">The Intelligence Brief for this story is being generated.<br/>This usually takes under a minute.</p>
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>
@@ -699,7 +714,7 @@ export default function BriefingPage() {
               
               <div className="mt-auto pt-8 border-t border-mist/30">
                 <p className="text-[8px] font-bold uppercase tracking-widest text-slate/30 text-center leading-relaxed">
-                  Powered by Google Gemini<br/>
+                  Powered by Google Gemma 2 27B<br/>
                   Vernacular Engine v2.0
                 </p>
               </div>

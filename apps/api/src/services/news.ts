@@ -15,27 +15,35 @@ export type RawArticle = {
 };
 
 const rssFeeds = [
-  // The Economic Times
+  // ── The Economic Times ──────────────────────────────────────────────
   { url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms", category: "top-news" },
   { url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: "markets" },
   { url: "https://economictimes.indiatimes.com/industry/rssfeeds/13352306.cms", category: "business" },
   { url: "https://economictimes.indiatimes.com/tech/rssfeeds/13358319.cms", category: "technology" },
-  
-  // Google News RSS (Categorized)
+
+  // ── Google News (India-focused) ─────────────────────────────────────
   { url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-IN&gl=IN&ceid=IN:en", category: "world" },
   { url: "https://news.google.com/rss/headlines/section/topic/NATION?hl=en-IN&gl=IN&ceid=IN:en", category: "policy" },
   { url: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-IN&gl=IN&ceid=IN:en", category: "business" },
   { url: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-IN&gl=IN&ceid=IN:en", category: "technology" },
   { url: "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-IN&gl=IN&ceid=IN:en", category: "science" },
-  { url: "https://news.google.com/rss/headlines/section/topic/HEALTH?hl=en-IN&gl=IN&ceid=IN:en", category: "health" },
-  
-  // Search-based (for Finance/Market specificity)
   { url: "https://news.google.com/rss/search?q=finance+stock+market&hl=en-IN&gl=IN&ceid=IN:en", category: "markets" },
 
-  // International
-  { url: "https://www.reutersagency.com/feed/?best-topics=business", category: "business" },
-  { url: "http://feeds.bbci.co.uk/news/world/rss.xml", category: "world" },
-  { url: "http://feeds.bbci.co.uk/news/business/rss.xml", category: "business" }
+  // ── BBC (World & Tech) ──────────────────────────────────────────────
+  { url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "world" },
+  { url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: "business" },
+  { url: "https://feeds.bbci.co.uk/news/technology/rss.xml", category: "technology" },
+  { url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", category: "science" },
+  { url: "https://feeds.bbci.co.uk/news/health/rss.xml", category: "health" },
+  { url: "https://feeds.bbci.co.uk/news/politics/rss.xml", category: "policy" },
+
+  // ── Tech News ───────────────────────────────────────────────────────
+  { url: "https://techcrunch.com/feed/", category: "technology" },
+  { url: "https://www.theverge.com/rss/index.xml", category: "technology" },
+  { url: "https://feeds.arstechnica.com/arstechnica/index", category: "technology" },
+  { url: "https://www.wired.com/feed/rss", category: "technology" },
+  { url: "https://feeds.feedburner.com/venturebeat/SZYF", category: "technology" },
+  { url: "https://hnrss.org/frontpage", category: "technology" }, // Hacker News front page
 ];
 
 const parser = new Parser();
@@ -117,9 +125,9 @@ async function fetchRss(): Promise<RawArticle[]> {
       const parsed = await parser.parseURL(feed.url);
       parsed.items.forEach((item) => {
         if (!item.link || !item.title) return;
-        const imageUrl = item.enclosure?.url || 
-                        (item.content?.match(/src="([^"]+)"/) || [])[1] || 
-                        null;
+        const imageUrl = item.enclosure?.url ||
+          (item.content?.match(/src="([^"]+)"/) || [])[1] ||
+          null;
         results.push({
           externalId: item.guid ?? item.link,
           title: item.title,
@@ -133,7 +141,7 @@ async function fetchRss(): Promise<RawArticle[]> {
         });
       });
     } catch (e) {
-      console.error(`Failed to fetch RSS ${feed}:`, e);
+      console.error(`Failed to fetch RSS from ${feed.url}:`, e);
     }
   }
   return results;
@@ -142,7 +150,7 @@ async function fetchRss(): Promise<RawArticle[]> {
 export async function fetchAllArticles(): Promise<RawArticle[]> {
   const categories = ["technology", "business", "science", "general", "health", "sports", "entertainment"];
   const countries = ["us", "in", "gb", "ca", "au"];
-  
+
   const newsapiResults: RawArticle[][] = [];
   for (const country of countries) {
     for (const cat of categories) {
@@ -158,7 +166,7 @@ export async function fetchAllArticles(): Promise<RawArticle[]> {
     gnewsResults.push(res);
     await new Promise(resolve => setTimeout(resolve, 300));
   }
-  
+
   const [rss, scrapedTC, scrapedET] = await Promise.all([
     fetchRss().catch(() => []),
     scrapeTechCrunch().catch(() => []),
@@ -166,10 +174,10 @@ export async function fetchAllArticles(): Promise<RawArticle[]> {
   ]);
 
   return [
-    ...scrapedTC, 
-    ...scrapedET, 
-    ...rss, 
-    ...newsapiResults.flat(), 
+    ...scrapedTC,
+    ...scrapedET,
+    ...rss,
+    ...newsapiResults.flat(),
     ...gnewsResults.flat()
   ];
 }

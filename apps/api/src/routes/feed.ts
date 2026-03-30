@@ -14,219 +14,45 @@ feedRoutes.get("/feed", optionalAuthMiddleware, async (c) => {
   const offset = Number(c.req.query("offset") ?? 0);
   const limit = Number(c.req.query("limit") ?? 20);
 
-  if (!user) {
-    // PUBLIC ACCESS: No user session, return generic latest feed
-    const latest = await db
-      .select({ article: articles })
-      .from(articles)
-      .innerJoin(stories, eq(articles.storyId, stories.id))
-      .where(eq(stories.briefingStale, false))
-      .orderBy(desc(articles.createdAt))
-      .limit(limit)
-      .offset(offset);
+  // Simple chronological feed: latest AI-processed articles for everyone
+  const latest = await db
+    .select({ article: articles })
+    .from(articles)
+    .leftJoin(stories, eq(articles.storyId, stories.id))
+    .where(eq(stories.briefingStale, false))
+    .orderBy(desc(articles.createdAt))
+    .limit(limit)
+    .offset(offset);
 
-    const framed = await Promise.all(
-      latest.map(async ({ article }) => ({
-        ...article,
-        publishedAt: article.createdAt.toISOString(),
-        frame: await getFrame({
-          articleId: article.id,
-          summary: article.summary,
-          depthTier: "explainer",
-          fast: true
-        }),
-        isLiked: false,
-        isBookmarked: false
-      }))
-    );
-
-    return c.json({ articles: framed });
-  }
-
-  const signalCountResult = await db
-    .select({ id: articleSignals.id })
-    .from(articleSignals)
-    .where(eq(articleSignals.userId, user.id));
-  const signalCount = signalCountResult.length;
-
-  if (signalCount < 5) {
-    const latest = await db
-      .select({ article: articles })
-      .from(articles)
-      .innerJoin(stories, eq(articles.storyId, stories.id))
-      .where(eq(stories.briefingStale, false))
-      .orderBy(desc(articles.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    const framed = await Promise.all(
-      latest.map(async ({ article }) => ({
-        ...article,
-        frame: await getFrame({
-          articleId: article.id,
-          summary: article.summary,
-          depthTier: "explainer",
-          fast: true
-        })
-      }))
-    );
-
-    return c.json({ articles: framed });
-  }
-
-  const topicInterests = await db
-    .select()
-    .from(userTopicInterests)
-    .where(eq(userTopicInterests.userId, user.id));
-
-  const entityAffinities = await db
-    .select()
-    .from(userEntityAffinity)
-    .where(eq(userEntityAffinity.userId, user.id));
-
-  const topicMap = new Map(
-    topicInterests.map((interest) => [interest.topicSlug, interest])
-  );
-  const entityMap = new Map(
-    entityAffinities.map((affinity) => [affinity.entityName, affinity])
-  );
-
-  const userResult = await db.select({ embedding: users.embedding }).from(users).where(eq(users.id, user.id)).limit(1);
-  const userEmbedding = userResult[0]?.embedding;
-
-  const allInteractedIds = (await db
-    .select({ articleId: articleSignals.articleId })
-    .from(articleSignals)
-    .where(eq(articleSignals.userId, user.id))).map(s => s.articleId);
-
-  const likedOrSavedIds = (await db
-    .select({ articleId: articleSignals.articleId })
-    .from(articleSignals)
-    .where(
-      and(
-        eq(articleSignals.userId, user.id),
-        or(eq(articleSignals.liked, true), eq(articleSignals.saved, true))
-      )
-    )).map(s => s.articleId);
-
-  const excludeList = allInteractedIds.filter(id => !likedOrSavedIds.includes(id));
-
-  const candidates = excludeList.length
-    ? await db
-        .select({ article: articles })
-        .from(articles)
-        .innerJoin(stories, eq(articles.storyId, stories.id))
-        .where(
-          and(
-            notInArray(articles.id, excludeList),
-            eq(stories.briefingStale, false)
-          )
-        )
-        .orderBy(desc(articles.createdAt))
-        .limit(200)
-    : await db
-        .select({ article: articles })
-        .from(articles)
-        .innerJoin(stories, eq(articles.storyId, stories.id))
-        .where(eq(stories.briefingStale, false))
-        .orderBy(desc(articles.createdAt))
-        .limit(200);
-
-  const now = new Date();
-
-  const scored = candidates.map(({ article }) => {
-    const topicScore = article.topicSlugs.reduce((sum, slug) => {
-      const weight = topicMap.get(slug)?.weight ?? 0;
-      return sum + weight;
-    }, 0);
-
-    const entities = (article.entities ?? []) as { name: string }[];
-    const entityScore = entities.reduce((sum, entity) => {
-      const weight = entityMap.get(entity.name)?.affinityScore ?? 0;
-      return sum + weight;
-    }, 0);
-
-    const hoursOld = article.createdAt
-      ? (now.getTime() - article.createdAt.getTime()) / (1000 * 60 * 60)
-      : 0;
-    const recencyScore = clamp(1 - hoursOld / (24 * 7), 0, 1);
-
-    let vectorScore = 0;
-    if (userEmbedding && article.embedding) {
-      const artEmb = article.embedding;
-      const dotProduct = userEmbedding.reduce((sum, val, i) => sum + val * (artEmb[i] ?? 0), 0);
-      vectorScore = clamp(dotProduct, 0, 1);
-    }
-
-    const baseScore =
-      topicScore * 0.3 + entityScore * 0.15 + recencyScore * 0.15 + vectorScore * 0.3 + 0.1;
-
-    return {
-      article,
-      baseScore,
-      topicScore,
-      entityScore,
-      recencyScore,
-      vectorScore
-    };
-  });
-
-  const sorted = scored.sort((a, b) => b.baseScore - a.baseScore);
-
-  const selected: typeof scored = [];
-  const topStoryIds = new Set<string>();
-
-  for (const item of sorted) {
-    if (selected.length >= limit) break;
-    const storyId = item.article.storyId;
-    const penalty = storyId && topStoryIds.has(storyId) ? 0.2 : 1;
-    const feedScore =
-      item.topicScore * 0.3 +
-      item.entityScore * 0.15 +
-      item.recencyScore * 0.15 +
-      item.vectorScore * 0.3 +
-      penalty * 0.1;
-
-    selected.push({ ...item, baseScore: feedScore });
-
-    if (selected.length <= 5 && storyId) {
-      topStoryIds.add(storyId);
+  // If user is logged in, attach like/bookmark state
+  let signalsMap = new Map<string, { liked: boolean; saved: boolean }>();
+  if (user) {
+    const articleIds = latest.map(r => r.article.id);
+    if (articleIds.length > 0) {
+      const signals = await db
+        .select()
+        .from(articleSignals)
+        .where(and(eq(articleSignals.userId, user.id), inArray(articleSignals.articleId, articleIds)));
+      signalsMap = new Map(signals.map(s => [s.articleId, { liked: s.liked ?? false, saved: s.saved ?? false }]));
     }
   }
 
-  const depthTier = (topic: string | undefined) =>
-    topic ? topicMap.get(topic)?.depthTier ?? "explainer" : "explainer";
-
-  const articlesWithFrames = await Promise.all(
-    selected.map(async ({ article }) => ({
+  const framed = await Promise.all(
+    latest.map(async ({ article }) => ({
       ...article,
-      publishedAt: article.createdAt.toISOString(), // Use ingestion time for display
+      publishedAt: article.createdAt.toISOString(),
       frame: await getFrame({
         articleId: article.id,
         summary: article.summary,
-        depthTier: depthTier(article.topicSlugs[0]),
+        depthTier: "explainer",
         fast: true
-      })
+      }),
+      isLiked: signalsMap.get(article.id)?.liked ?? false,
+      isBookmarked: signalsMap.get(article.id)?.saved ?? false,
     }))
   );
 
-  const signals = await db
-    .select()
-    .from(articleSignals)
-    .where(and(eq(articleSignals.userId, user.id), inArray(articleSignals.articleId, articlesWithFrames.map(a => a.id))));
-  
-  const signalsMap = new Map(signals.map(s => [s.articleId, s]));
-
-  const finalResult = articlesWithFrames.map((article) => {
-    const s = signalsMap.get(article.id);
-    return {
-      ...article,
-      isLiked: s?.liked ?? false,
-      isBookmarked: s?.saved ?? false
-    };
-  });
-
-  return c.json({ articles: finalResult });
+  return c.json({ articles: framed });
 });
 
 feedRoutes.get("/feed/liked", authMiddleware, async (c) => {
@@ -284,7 +110,8 @@ feedRoutes.get("/feed/liked", authMiddleware, async (c) => {
         }),
         isLiked: true,
         isBookmarked: false, // We'd need another query to get the TRUE bookmark status
-        interactedAt: likedAt
+        interactedAt: likedAt,
+        publishedAt: article.createdAt.toISOString() // Consistent mapping
       };
     })
   );
@@ -347,7 +174,8 @@ feedRoutes.get("/feed/bookmarked", authMiddleware, async (c) => {
         }),
         isLiked: isLiked,
         isBookmarked: true,
-        interactedAt: bookmarkedAt
+        interactedAt: bookmarkedAt,
+        publishedAt: article.createdAt.toISOString() // Consistent mapping
       };
     })
   );
@@ -373,7 +201,7 @@ feedRoutes.get("/feed/search", authMiddleware, async (c) => {
         sql`lower(${articles.summary}) like ${searchPattern}`
       )
     )
-    .orderBy(desc(articles.publishedAt))
+    .orderBy(desc(articles.createdAt))
     .limit(limit)
     .offset(offset);
 
@@ -382,6 +210,7 @@ feedRoutes.get("/feed/search", authMiddleware, async (c) => {
   const articlesWithFrames = await Promise.all(
     results.map(async (article) => ({
       ...article,
+      publishedAt: article.createdAt.toISOString(), // Use ingestion time
       frame: await getFrame({
         articleId: article.id,
         summary: article.summary,
@@ -419,14 +248,42 @@ feedRoutes.get("/feed/trending", optionalAuthMiddleware, async (c) => {
     .orderBy(desc(stories.latestArticleAt))
     .limit(15);
 
+  // For each story, grab the first article that has an image
+  const storiesWithImages = await Promise.all(
+    trendingStories.map(async (s) => {
+      const firstArticle = await db
+        .select({ imageUrl: articles.imageUrl })
+        .from(articles)
+        .where(and(eq(articles.storyId, s.id), sql`${articles.imageUrl} IS NOT NULL`))
+        .orderBy(desc(articles.createdAt))
+        .limit(1);
+
+      return {
+        id: s.id,
+        category: s.topicSlugs[0] ?? "Breaking",
+        topic: s.headline,
+        count: `${s.articleCount} articles`,
+        latestArticleAt: s.latestArticleAt?.toISOString(),
+        imageUrl: firstArticle[0]?.imageUrl ?? null,
+      };
+    })
+  );
+
+  return c.json({ trending: storiesWithImages });
+});
+
+feedRoutes.get("/feed/latest", optionalAuthMiddleware, async (c) => {
+  const latest = await db
+    .select({ createdAt: articles.createdAt, id: articles.id })
+    .from(articles)
+    .leftJoin(stories, eq(articles.storyId, stories.id))
+    .where(eq(stories.briefingStale, false))
+    .orderBy(desc(articles.createdAt))
+    .limit(1);
+
   return c.json({
-    trending: trendingStories.map((s) => ({
-      id: s.id,
-      category: s.topicSlugs[0] ?? "Breaking",
-      topic: s.headline,
-      count: `${s.articleCount} articles`,
-      latestArticleAt: s.latestArticleAt?.toISOString()
-    }))
+    latestId: latest[0]?.id ?? null,
+    latestAt: latest[0]?.createdAt?.toISOString() ?? null,
   });
 });
 

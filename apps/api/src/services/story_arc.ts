@@ -1,4 +1,4 @@
-import { callGroq, groqCompletion } from "./anthropic";
+import { groqCompletion } from "./anthropic";
 
 export type StoryArc = {
   story_id: string;
@@ -11,7 +11,7 @@ export type StoryArc = {
 export async function generateStoryArc(params: {
   storyId: string;
   articles: { id: string; title: string; summary: string; publishedAt: Date | null }[];
-}) {
+}, onHeartbeat?: () => Promise<void>) {
   const context = params.articles
     .map(a => `[Article: ${a.id}, Date: ${a.publishedAt?.toISOString() ?? "N/A"}]\nTitle: ${a.title}\nSummary: ${a.summary}`)
     .join("\n\n---\n\n");
@@ -37,10 +37,7 @@ Return JSON with schema:
   "predictions": [{"scenario": "string", "probability": "string", "trigger": "string"}]
 }`;
 
-  const arc = await callGroq(async () => {
-    const text = await groqCompletion(systemPrompt, userPrompt);
-    return JSON.parse(text);
-  });
-
-  return arc;
+  // groqCompletion already goes through the AI queue — no outer wrapper needed
+  const text = await groqCompletion(systemPrompt, userPrompt, onHeartbeat);
+  return JSON.parse(text);
 }

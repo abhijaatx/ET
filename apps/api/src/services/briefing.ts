@@ -1,10 +1,10 @@
-import { callGroq, groqCompletion } from "./anthropic";
+import { groqCompletion } from "./anthropic";
 
 export async function generateBriefing(params: {
   storyId: string;
   depthTier: string;
   articles: { id: string; title: string; content: string; url: string; author: string | null; publishedAt: Date | null }[];
-}) {
+}, onHeartbeat?: () => Promise<void>) {
   const context = params.articles
     .map(
       (article) =>
@@ -12,10 +12,10 @@ export async function generateBriefing(params: {
     )
     .join("\n\n");
 
-  const briefing = await callGroq(async () => {
-    const text = await groqCompletion(
-      "You are a Lead Intelligence Analyst at The Economic Times. Synthesise the provided articles into a high-stakes 'Deep Briefing'.",
-      `Story context:
+  // groqCompletion already goes through the AI queue — no outer wrapper needed
+  const text = await groqCompletion(
+    "You are a Lead Intelligence Analyst at The Economic Times. Synthesise the provided articles into a high-stakes 'Deep Briefing'.",
+    `Story context:
 ${context}
 
 Instructions:
@@ -27,16 +27,14 @@ Instructions:
    - story_id: ${params.storyId}
    - headline: A sharp, analytical title.
    - executive_summary: A high-impact 'Bottom Line' paragraph (2-3 sentences).
-   - sections: Array of objects { id, title, content, citations: [article_ids] }. Sections should be thematic (e.g. 'The Market Response', 'Political Headwinds', 'Policy Nuances').
+   - sections: Array of objects { id, title, content, citations: [article_ids] }. Sections should be thematic (e.g. 'The Market Response', 'The Political Response', 'The Global Response').
    - key_entities: [{ name, type, role }]
    - suggested_questions: 3 specific, inquisitive follow-up questions to deepen the conversation.
    - source_articles: The original article metadata provided.
 
-No preamble. No markdown wrapping.`
-    );
+No preamble. No markdown wrapping.`,
+    onHeartbeat
+  );
 
-    return JSON.parse(text);
-  });
-
-  return briefing;
+  return JSON.parse(text);
 }

@@ -1,38 +1,28 @@
-import type { FeatureExtractionPipeline } from "@xenova/transformers";
+import { nvidia } from "./nvidia_client";
 
-let embedderPromise: Promise<FeatureExtractionPipeline> | null = null;
-
-async function getEmbedder() {
-  if (!embedderPromise) {
-    embedderPromise = (async () => {
-      const { pipeline, env } = await import("@xenova/transformers");
-      env.cacheDir = "/tmp/transformers";
-      env.remoteHost = "https://hf-mirror.com/";
-      let lastError;
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        try {
-          console.log(`[Embedder] Loading model Xenova/all-MiniLM-L6-v2 (Attempt ${attempt}/5)...`);
-          return await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-        } catch (e) {
-          console.error(`[Embedder] Attempt ${attempt} failed:`, e?.toString().split('\\n')[0]);
-          lastError = e;
-          if (attempt < 5) await new Promise(r => setTimeout(r, 4000));
-        }
-      }
-      embedderPromise = null;
-      throw lastError;
-    })();
-  }
-  return embedderPromise;
-}
-
+/**
+ * High-availability embedding generation using hosted NVIDIA models.
+ * Uses nv-embedqa-e5-v5 and truncates to 384 dims to match the existing DB schema
+ * without requiring a migration.
+ */
 export async function embedText(text: string): Promise<number[]> {
   try {
-    const embedder = await getEmbedder();
-    const output = await embedder(text, { pooling: "mean", normalize: true });
-    return Array.from(output.data as Float32Array);
-  } catch (error) {
-    console.warn("[Embeddings] Model download blocked by network firewall. Proceeding with zero-vector fallback.");
+    const response = await (nvidia as any).embeddings.create({
+      model: "nvidia/nv-embedqa-e5-v5",
+      input: text,
+      encoding_format: "float",
+      input_type: "passage", // Required for asymmetric models
+      truncate: "END",
+    });
+
+    const embedding: number[] = response.data[0]?.embedding;
+    if (!embedding) throw new Error("No embedding returned from NVIDIA");
+
+    // Truncate to 384 dims to match existing DB vector(384) columns.
+    // This avoids a DB migration while still using the hosted API.
+    return embedding.slice(0, 384);
+  } catch (error: any) {
+    console.error(`[Embeddings] NVIDIA Error: ${error.message}. Falling back to zero-vector.`);
     return new Array(384).fill(0);
   }
 }

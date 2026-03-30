@@ -13,7 +13,7 @@ import authorRoutes from "./routes/authors";
 import notificationsRoutes from "./routes/notifications";
 import userRoutes from "./routes/user";
 import broadcastRoutes from "./routes/broadcast";
-import { enqueueImmediateIngest, scheduleIngest } from "./queues/ingest";
+import { enqueueImmediateIngest, scheduleIngest, startIngestWatchdog } from "./queues/ingest";
 import "./workers/ingest";
 import "./workers/story-ai";
 import type { AppEnv } from "./types/app";
@@ -58,13 +58,13 @@ app.route("/api", notificationsRoutes);
 app.route("/api", userRoutes);
 app.route("/api", broadcastRoutes);
 
-// Re-pausing ingestion for isolated TTS verification as requested
-// scheduleIngest().catch((err: unknown) => {
-//   console.error("Failed to schedule ingest", err);
-// });
-// enqueueImmediateIngest().catch((err: unknown) => {
-//   console.error("Failed to enqueue initial ingest", err);
-// });
+scheduleIngest().catch((err: unknown) => {
+  console.error("Failed to schedule ingest", err);
+});
+enqueueImmediateIngest().catch((err: unknown) => {
+  console.error("Failed to enqueue initial ingest", err);
+});
+startIngestWatchdog();
 
 serve({
   fetch: app.fetch,

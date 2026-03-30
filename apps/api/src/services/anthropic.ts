@@ -1,141 +1,116 @@
 import { env } from "../env";
-import { withRetry } from "../utils/retry";
-import Groq from "groq-sdk";
+import { MODEL, callNvidia, nvidia, setPause, extractJson } from "./nvidia_client";
 
-const groq = new Groq({
-  apiKey: env.GROQ_API_KEY
-});
-
-// Global queue to stay under AI limits (5 RPM = 12000ms per call)
-let lastCallTime = 0;
-let pauseUntil = 0;
-const MIN_INTERVAL_MS = 12000;
-
-export async function callGroq<T>(fn: () => Promise<T>) {
-  return withRetry(async () => {
-    const now = Date.now();
-    
-    // Check if we are in a 2-minute cooldown
-    if (now < pauseUntil) {
-      const waitTime = pauseUntil - now;
-      console.warn(`[AI] Cooldown active. Waiting ${Math.ceil(waitTime / 1000)}s...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    const timeSinceLast = Date.now() - lastCallTime;
-    
-    if (timeSinceLast < MIN_INTERVAL_MS) {
-      const waitTime = MIN_INTERVAL_MS - timeSinceLast + (Math.random() * 200);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-    
-    lastCallTime = Date.now();
-    return await fn();
-  }, { retries: 5, baseDelayMs: 1000 });
-}
-
-function cleanJson(text: string): string {
-  // Remove markdown code blocks if present
-  return text.replace(/```json\n?|```\n?/g, "").trim();
-}
-
-const MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
-  "mixtral-8x7b-32768"
-];
-
-export async function groqCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-  if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY is missing");
+/**
+ * Normalizes messages for NVIDIA by merging the first system message into the first user message,
+ * as the NVIDIA Gemma-2-27B endpoint does not support the 'system' role.
+ */
+function normalizeMessages(messages: any[]) {
+  const result = [...messages];
+  const firstSystemIndex = result.findIndex(m => m.role === "system");
   
-  let lastError: any = null;
-
-  return await callGroq(async () => {
-    for (const model of MODELS) {
-      try {
-        console.log(`[AI] Using Groq (${model}) for completion...`);
-        const chatCompletion = await groq.chat.completions.create({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          model: model,
-          temperature: 0.5,
-          max_tokens: 4096,
-        });
-
-        return cleanJson(chatCompletion.choices[0]?.message?.content || "");
-      } catch (error: any) {
-        lastError = error;
-        // Continue to next model on any error
-        if (error?.status === 429) {
-          console.warn(`[AI] Model ${model} rate limited (429). Pausing for 2 mins...`);
-          pauseUntil = Date.now() + 120 * 1000;
-        } else {
-          console.error(`[AI] ${model} failed:`, error.message);
-        }
-        continue;
-      }
+  if (firstSystemIndex !== -1) {
+    const systemContent = result[firstSystemIndex].content;
+    result.splice(firstSystemIndex, 1);
+    
+    const firstUserIndex = result.findIndex(m => m.role === "user");
+    if (firstUserIndex !== -1) {
+      result[firstUserIndex].content = `Instruction: ${systemContent}\n\nTask: ${result[firstUserIndex].content}`;
+    } else {
+      // Add as user message if no user message exists
+      result.unshift({ role: "user", content: systemContent });
     }
-    throw lastError;
-  });
+  }
+  
+  // Also filter any remaining system messages out to be safe
+  return result.filter(m => m.role !== "system");
 }
 
+/**
+ * Compatibility wrapper for the groqCompletion function signature.
+ */
+export async function groqCompletion(systemPrompt: string, userPrompt: string, onHeartbeat?: () => Promise<void>): Promise<string> {
+  if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA_API_KEY is missing");
+  
+  return await callNvidia(async () => {
+    try {
+      console.log(`[AI-Anthropic] Using NVIDIA (${MODEL})...`);
+      
+      const messages = normalizeMessages([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]);
+
+      const chatCompletion = await nvidia.chat.completions.create({
+        messages: messages,
+        model: MODEL,
+        temperature: 0.2,
+        top_p: 0.7,
+        max_tokens: 4096,
+      });
+
+      return extractJson(chatCompletion.choices[0]?.message?.content || "");
+    } catch (error: any) {
+      if (error?.status === 429) {
+        setPause(120 * 1000);
+      } else {
+        console.error(`[AI-Anthropic] NVIDIA ${MODEL} failed:`, error.message);
+      }
+      throw error;
+    }
+  }, onHeartbeat);
+}
+
+/**
+ * Compatibility wrapper for the streamGroqCompletion function signature.
+ */
 export async function streamGroqCompletion(
   systemPrompt: string,
   userPrompt: string,
   history: { role: "user" | "assistant", content: string }[],
   onToken: (token: string) => Promise<void> | void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onHeartbeat?: () => Promise<void>
 ) {
-  if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY is missing");
+  if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA_API_KEY is missing");
 
-  const now = Date.now();
-  if (now < pauseUntil) {
-    const waitTime = pauseUntil - now;
-    console.warn(`[AI] Cooldown active for stream. Waiting ${Math.ceil(waitTime / 1000)}s...`);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-  }
+  return await callNvidia(async () => {
+    try {
+      console.log(`[AI-Anthropic] Streaming NVIDIA (${MODEL})...`);
 
-  let lastError: any = null;
+      const messages = normalizeMessages([
+        { role: "system", content: systemPrompt },
+        ...history.map(h => ({ role: h.role, content: h.content })),
+        { role: "user", content: userPrompt }
+      ]);
 
-  return await callGroq(async () => {
-    for (const model of MODELS) {
-      try {
-        console.log(`[AI] Using Groq (${model}) for streaming...`);
+      const stream = await nvidia.chat.completions.create({
+        messages: messages,
+        model: MODEL,
+        temperature: 0.2,
+        top_p: 0.7,
+        max_tokens: 4096,
+        stream: true,
+      });
 
-        const stream = await groq.chat.completions.create({
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...history.map(h => ({ role: h.role, content: h.content })),
-            { role: "user", content: userPrompt }
-          ],
-          model: model,
-          temperature: 0.5,
-          max_tokens: 4096,
-          stream: true,
-        });
-
-        for await (const chunk of stream) {
-          if (signal?.aborted) break;
-          const content = chunk.choices[0]?.delta?.content || "";
-          if (content) {
-            await onToken(content);
-          }
+      for await (const chunk of stream) {
+        if (signal?.aborted) break;
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          await onToken(content);
         }
-        return; // Success
-      } catch (error: any) {
-        lastError = error;
-        if (error?.status === 429) {
-          console.warn(`[AI] Model ${model} rate limited (429) during stream. Pausing for 2 mins...`);
-          pauseUntil = Date.now() + 120 * 1000;
-        } else {
-          console.error(`[AI] Stream with ${model} failed:`, error.message);
-        }
-        continue;
       }
+      return; // Success
+    } catch (error: any) {
+      if (error?.status === 429) {
+        setPause(120 * 1000);
+      } else {
+        console.error(`[AI-Anthropic] Stream with NVIDIA ${MODEL} failed:`, error.message);
+      }
+      throw error;
     }
-    throw lastError;
-  });
+  }, onHeartbeat);
 }
 
+// Preserve export names for consumers
+export { callNvidia as callGroq };
