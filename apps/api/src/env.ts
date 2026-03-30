@@ -1,26 +1,7 @@
 import { z } from "zod";
-import * as dotenv from "dotenv";
-import { resolve } from "path";
 
-// Try to find .env in current dir, or two levels up (monorepo root)
-const possiblePaths = [
-  resolve(process.cwd(), ".env"),
-  resolve(process.cwd(), "../../.env")
-];
-
-let loaded = false;
-for (const p of possiblePaths) {
-  const result = dotenv.config({ path: p });
-  if (!result.error) {
-    console.log(`[Env] Successfully loaded .env from: ${p}`);
-    loaded = true;
-    break;
-  }
-}
-
-if (!loaded) {
-  console.warn("[Env] Could not find .env file in expected locations. Using process.env defaults.");
-}
+// On Vercel: env vars are injected directly into process.env.
+// For local dev: dotenvx (configured in package.json scripts) handles .env loading.
 
 const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional().default(""),
