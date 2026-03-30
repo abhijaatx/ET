@@ -5,7 +5,8 @@ import { users } from "@myet/db";
 import { eq } from "drizzle-orm";
 import { lucia } from "../auth";
 import { setCookie } from "hono/cookie";
-import argon2 from "argon2";
+import bcrypt from "bcryptjs";
+
 import { authMiddleware } from "../middleware/auth";
 import type { AppEnv } from "../types/app";
 
@@ -29,7 +30,7 @@ authRoutes.post("/register", async (c) => {
     return c.json({ error: "Email already registered" }, 400);
   }
 
-  const passwordHash = await argon2.hash(body.password);
+  const passwordHash = await bcrypt.hash(body.password, 12);
   const inserted = await db
     .insert(users)
     .values({ email: body.email, passwordHash })
@@ -57,7 +58,7 @@ authRoutes.post("/login", async (c) => {
   const user = existing[0];
   if (!user) return c.json({ error: "Invalid credentials" }, 401);
 
-  const valid = await argon2.verify(user.passwordHash, body.password);
+  const valid = await bcrypt.compare(body.password, user.passwordHash);
   if (!valid) return c.json({ error: "Invalid credentials" }, 401);
 
   const session = await lucia.createSession(user.id, {});
