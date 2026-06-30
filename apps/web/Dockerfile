@@ -10,4 +10,6 @@ ARG INTERNAL_API_URL=http://api:3001
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV INTERNAL_API_URL=${INTERNAL_API_URL}
 RUN npm run build --workspace=apps/web
-CMD ["node", "apps/web/.next/standalone/server.js"]
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+CMD ["node", "apps/web/.next/standalone/apps/web/server.js"]
