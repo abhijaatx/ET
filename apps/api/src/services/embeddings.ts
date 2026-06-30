@@ -1,4 +1,4 @@
-import { nvidia } from "./nvidia_client";
+import { hasUsableNvidiaKey, nvidia } from "./nvidia_client";
 
 /**
  * High-availability embedding generation using hosted NVIDIA models.
@@ -6,6 +6,10 @@ import { nvidia } from "./nvidia_client";
  * without requiring a migration.
  */
 export async function embedText(text: string): Promise<number[]> {
+  if (!hasUsableNvidiaKey()) {
+    return new Array(384).fill(0);
+  }
+
   try {
     const response = await (nvidia as any).embeddings.create({
       model: "nvidia/nv-embedqa-e5-v5",

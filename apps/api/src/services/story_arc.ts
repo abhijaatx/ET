@@ -8,6 +8,36 @@ export type StoryArc = {
   predictions: { scenario: string; probability: string; trigger: string }[];
 };
 
+function fallbackStoryArc(params: {
+  storyId: string;
+  articles: { id: string; title: string; summary: string; publishedAt: Date | null }[];
+}): StoryArc {
+  const sortedArticles = [...params.articles].sort((a, b) => {
+    const aTime = a.publishedAt?.getTime() ?? 0;
+    const bTime = b.publishedAt?.getTime() ?? 0;
+    return aTime - bTime;
+  });
+
+  return {
+    story_id: params.storyId,
+    timeline: sortedArticles.map((article) => ({
+      date: article.publishedAt?.toISOString() ?? new Date().toISOString(),
+      event: article.title,
+      article_id: article.id,
+      impact_level: "medium"
+    })),
+    players: [],
+    contrarian_views: [],
+    predictions: [
+      {
+        scenario: "More reporting clarifies the impact of this development.",
+        probability: "unknown",
+        trigger: "Follow-up coverage from source publications"
+      }
+    ]
+  };
+}
+
 export async function generateStoryArc(params: {
   storyId: string;
   articles: { id: string; title: string; summary: string; publishedAt: Date | null }[];
@@ -37,7 +67,12 @@ Return JSON with schema:
   "predictions": [{"scenario": "string", "probability": "string", "trigger": "string"}]
 }`;
 
-  // groqCompletion already goes through the AI queue — no outer wrapper needed
-  const text = await groqCompletion(systemPrompt, userPrompt, onHeartbeat);
-  return JSON.parse(text);
+  try {
+    // groqCompletion already goes through the AI queue — no outer wrapper needed
+    const text = await groqCompletion(systemPrompt, userPrompt, onHeartbeat);
+    return JSON.parse(text);
+  } catch (err: any) {
+    console.warn("[Story Arc] AI generation failed, using local fallback:", err?.message ?? err);
+    return fallbackStoryArc(params);
+  }
 }

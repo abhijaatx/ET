@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const internalApiUrl = process.env.INTERNAL_API_URL ?? "http://localhost:3001";
+
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
@@ -11,11 +13,11 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:3001/api/:path*"
+        destination: `${internalApiUrl}/api/:path*`
       },
       {
         source: "/health",
-        destination: "http://localhost:3001/health"
+        destination: `${internalApiUrl}/health`
       }
     ];
   },

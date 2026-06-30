@@ -9,6 +9,11 @@ export const nvidia = new OpenAI({
 
 export const MODEL = "google/gemma-2-27b-it";
 
+export function hasUsableNvidiaKey() {
+  const key = env.NVIDIA_API_KEY.trim().toLowerCase();
+  return Boolean(key && !["dev-placeholder", "placeholder", "changeme"].includes(key));
+}
+
 // ============================================================
 // BACKGROUND QUEUE: Sequential, strict serialization for background
 // workers (ingestion, story-ai). Prevents rate limit bursts.

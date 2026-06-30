@@ -1,5 +1,16 @@
+import OpenAI from "openai";
 import { env } from "../env";
-import { MODEL, callNvidia, nvidia, setPause, extractJson } from "./nvidia_client";
+import { MODEL, callNvidia, nvidia, setPause, extractJson, hasUsableNvidiaKey } from "./nvidia_client";
+
+const groq = new OpenAI({
+  apiKey: env.GROQ_API_KEY || "missing",
+  baseURL: "https://api.groq.com/openai/v1",
+});
+
+function hasUsableGroqKey() {
+  const key = env.GROQ_API_KEY.trim().toLowerCase();
+  return Boolean(key && !["dev-placeholder", "placeholder", "changeme"].includes(key));
+}
 
 /**
  * Normalizes messages for NVIDIA by merging the first system message into the first user message,
@@ -30,11 +41,41 @@ function normalizeMessages(messages: any[]) {
  * Compatibility wrapper for the groqCompletion function signature.
  */
 export async function groqCompletion(systemPrompt: string, userPrompt: string, onHeartbeat?: () => Promise<void>): Promise<string> {
-  if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA_API_KEY is missing");
-  
+  if (hasUsableGroqKey()) {
+    return await callNvidia(async () => {
+      try {
+        console.log(`[AI] Using Groq (${env.GROQ_MODEL})...`);
+
+        const chatCompletion = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          model: env.GROQ_MODEL,
+          temperature: 0.2,
+          top_p: 0.7,
+          max_tokens: 4096,
+        });
+
+        return extractJson(chatCompletion.choices[0]?.message?.content || "");
+      } catch (error: any) {
+        if (error?.status === 429) {
+          setPause(120 * 1000);
+        } else {
+          console.error(`[AI] Groq ${env.GROQ_MODEL} failed:`, error.message);
+        }
+        throw error;
+      }
+    }, onHeartbeat);
+  }
+
+  if (!hasUsableNvidiaKey()) {
+    throw new Error("GROQ_API_KEY or NVIDIA_API_KEY is required for live AI calls");
+  }
+
   return await callNvidia(async () => {
     try {
-      console.log(`[AI-Anthropic] Using NVIDIA (${MODEL})...`);
+      console.log(`[AI] Using NVIDIA (${MODEL})...`);
       
       const messages = normalizeMessages([
         { role: "system", content: systemPrompt },
@@ -54,7 +95,7 @@ export async function groqCompletion(systemPrompt: string, userPrompt: string, o
       if (error?.status === 429) {
         setPause(120 * 1000);
       } else {
-        console.error(`[AI-Anthropic] NVIDIA ${MODEL} failed:`, error.message);
+        console.error(`[AI] NVIDIA ${MODEL} failed:`, error.message);
       }
       throw error;
     }
@@ -72,11 +113,50 @@ export async function streamGroqCompletion(
   signal?: AbortSignal,
   onHeartbeat?: () => Promise<void>
 ) {
-  if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA_API_KEY is missing");
+  if (hasUsableGroqKey()) {
+    return await callNvidia(async () => {
+      try {
+        console.log(`[AI] Streaming Groq (${env.GROQ_MODEL})...`);
+
+        const stream = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...history.map(h => ({ role: h.role, content: h.content })),
+            { role: "user", content: userPrompt }
+          ],
+          model: env.GROQ_MODEL,
+          temperature: 0.2,
+          top_p: 0.7,
+          max_tokens: 4096,
+          stream: true,
+        });
+
+        for await (const chunk of stream) {
+          if (signal?.aborted) break;
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            await onToken(content);
+          }
+        }
+        return;
+      } catch (error: any) {
+        if (error?.status === 429) {
+          setPause(120 * 1000);
+        } else {
+          console.error(`[AI] Stream with Groq ${env.GROQ_MODEL} failed:`, error.message);
+        }
+        throw error;
+      }
+    }, onHeartbeat);
+  }
+
+  if (!hasUsableNvidiaKey()) {
+    throw new Error("GROQ_API_KEY or NVIDIA_API_KEY is required for live AI calls");
+  }
 
   return await callNvidia(async () => {
     try {
-      console.log(`[AI-Anthropic] Streaming NVIDIA (${MODEL})...`);
+      console.log(`[AI] Streaming NVIDIA (${MODEL})...`);
 
       const messages = normalizeMessages([
         { role: "system", content: systemPrompt },
@@ -105,12 +185,15 @@ export async function streamGroqCompletion(
       if (error?.status === 429) {
         setPause(120 * 1000);
       } else {
-        console.error(`[AI-Anthropic] Stream with NVIDIA ${MODEL} failed:`, error.message);
+        console.error(`[AI] Stream with NVIDIA ${MODEL} failed:`, error.message);
       }
       throw error;
     }
   }, onHeartbeat);
 }
 
-// Preserve export names for consumers
-export { callNvidia as callGroq };
+// Preserve export name for legacy callers. Completion functions above already
+// enter the provider queue; wrapping them again can deadlock nested calls.
+export async function callGroq<T>(fn: () => Promise<T>): Promise<T> {
+  return fn();
+}

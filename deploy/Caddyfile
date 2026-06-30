@@ -1,0 +1,17 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	@api path /api/* /health
+	reverse_proxy @api api:3001
+
+	reverse_proxy web:3000
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
