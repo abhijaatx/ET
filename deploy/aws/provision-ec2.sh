@@ -3,8 +3,9 @@ set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-ap-south-1}"
 PROJECT_NAME="${PROJECT_NAME:-et}"
-INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.small}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.micro}"
 VOLUME_SIZE_GB="${VOLUME_SIZE_GB:-30}"
+SWAP_SIZE_GB="${SWAP_SIZE_GB:-2}"
 REPO_URL="${REPO_URL:-https://github.com/abhijaatx/ET.git}"
 BRANCH="${BRANCH:-main}"
 ENV_FILE="${ENV_FILE:-.env.production}"
@@ -142,6 +143,16 @@ docker compose version
 docker buildx version
 systemctl enable --now docker
 systemctl enable --now crond
+
+if [[ "${SWAP_SIZE_GB}" != "0" ]] && ! swapon --show | grep -q '/swapfile'; then
+  if ! fallocate -l "${SWAP_SIZE_GB}G" /swapfile; then
+    dd if=/dev/zero of=/swapfile bs=1M count=$(( ${SWAP_SIZE_GB} * 1024 ))
+  fi
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
 
 mkdir -p /opt
 if [ ! -d /opt/et/.git ]; then

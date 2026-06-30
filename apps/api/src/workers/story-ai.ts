@@ -86,7 +86,7 @@ export const storyAIWorker = new Worker(
   },
   {
     connection: redis as any,
-    concurrency: 2, // Limit parallel AI calls
+    concurrency: 1, // Keep low-cost AI quotas stable
     lockDuration: 3600000, // 1 hour (allow for long AI queues)
     stalledInterval: 60000, // 1 minute
   }

@@ -12,6 +12,8 @@ const envSchema = z.object({
   NVIDIA_API_KEY: z.string().min(1),
   GROQ_API_KEY: z.string().optional().default(""),
   GROQ_MODEL: z.string().optional().default("llama-3.1-8b-instant"),
+  GROQ_MIN_INTERVAL_MS: z.string().optional().default("25000"),
+  GROQ_COOLDOWN_MS: z.string().optional().default("120000"),
   GEMINI_API_KEY: z.string().optional().default(""),
   ELEVENLABS_API_KEY: z.string().optional().default(""),
   GROQ_VOICE_API_KEY: z.string().optional().default(""),

@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { StreamingTextResponse } from "ai";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL =
+  process.env.INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3001";
 
 function createTokenStream(upstream: Response) {
   const reader = upstream.body?.getReader();

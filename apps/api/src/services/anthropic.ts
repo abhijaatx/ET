@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { env } from "../env";
-import { MODEL, callNvidia, nvidia, setPause, extractJson, hasUsableNvidiaKey } from "./nvidia_client";
+import { MODEL, callGroqProvider, callNvidia, nvidia, setPause, extractJson, hasUsableNvidiaKey } from "./nvidia_client";
 
 const groq = new OpenAI({
   apiKey: env.GROQ_API_KEY || "missing",
@@ -42,7 +42,7 @@ function normalizeMessages(messages: any[]) {
  */
 export async function groqCompletion(systemPrompt: string, userPrompt: string, onHeartbeat?: () => Promise<void>): Promise<string> {
   if (hasUsableGroqKey()) {
-    return await callNvidia(async () => {
+    return await callGroqProvider(async () => {
       try {
         console.log(`[AI] Using Groq (${env.GROQ_MODEL})...`);
 
@@ -59,9 +59,7 @@ export async function groqCompletion(systemPrompt: string, userPrompt: string, o
 
         return extractJson(chatCompletion.choices[0]?.message?.content || "");
       } catch (error: any) {
-        if (error?.status === 429) {
-          setPause(120 * 1000);
-        } else {
+        if (error?.status !== 429) {
           console.error(`[AI] Groq ${env.GROQ_MODEL} failed:`, error.message);
         }
         throw error;
@@ -114,7 +112,7 @@ export async function streamGroqCompletion(
   onHeartbeat?: () => Promise<void>
 ) {
   if (hasUsableGroqKey()) {
-    return await callNvidia(async () => {
+    return await callGroqProvider(async () => {
       try {
         console.log(`[AI] Streaming Groq (${env.GROQ_MODEL})...`);
 
@@ -140,9 +138,7 @@ export async function streamGroqCompletion(
         }
         return;
       } catch (error: any) {
-        if (error?.status === 429) {
-          setPause(120 * 1000);
-        } else {
+        if (error?.status !== 429) {
           console.error(`[AI] Stream with Groq ${env.GROQ_MODEL} failed:`, error.message);
         }
         throw error;

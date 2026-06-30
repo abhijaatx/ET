@@ -157,7 +157,7 @@ export const ingestWorker = new Worker(
     console.log(`[ingest] Fetched ${rawArticles.length} raw articles. Process starting...`);
 
     let processedCount = 0;
-    const CONCURRENCY = 5;
+    const CONCURRENCY = 2;
 
     const onHeartbeat = async () => {
       await job.updateProgress(1); // Small heartbeat to refresh lock

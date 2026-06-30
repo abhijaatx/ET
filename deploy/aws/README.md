@@ -19,7 +19,7 @@ In Mumbai (`ap-south-1`), AWS pricing returned these Linux ARM on-demand rates:
 - `t4g.small`: `$0.0112/hour`, about `$8.18/month` before storage, IPv4, backups, and data transfer
 - `t4g.medium`: `$0.0224/hour`, about `$16.35/month` before storage, IPv4, backups, and data transfer
 
-Use `t4g.small` first. The app runs Next.js, the API, a worker, Postgres, and Redis; `t4g.micro` is likely to run out of memory. With 30 GB gp3, public IPv4, S3 backups, and light traffic, expect the practical floor to be roughly `$13-18/month`. Avoiding ALB, RDS, and ElastiCache saves the largest fixed costs.
+Use `t4g.micro` first with the script's default 2 GB swap file. The app runs Next.js, the API, a worker, Postgres, and Redis on one box; swap gives Docker builds and Postgres enough headroom for low traffic without paying for `t4g.small` all month. If memory pressure shows up under real traffic, move only the instance size to `t4g.small`. With 30 GB gp3, public IPv4, S3 backups, and light traffic, expect the practical floor to be roughly `$9-14/month`. Avoiding ALB, RDS, and ElastiCache saves the largest fixed costs.
 
 ## Prerequisites
 
@@ -57,7 +57,7 @@ AWS_REGION=ap-south-1 ./deploy/aws/provision-ec2.sh
 Optional overrides:
 
 ```bash
-INSTANCE_TYPE=t4g.medium VOLUME_SIZE_GB=50 ./deploy/aws/provision-ec2.sh
+INSTANCE_TYPE=t4g.small VOLUME_SIZE_GB=50 ./deploy/aws/provision-ec2.sh
 ```
 
 The script creates:
