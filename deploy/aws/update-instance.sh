@@ -44,7 +44,8 @@ COMMAND_ID="$(aws ssm send-command \
     \"git pull --ff-only origin ${BRANCH}\",
     \"aws ssm get-parameter --region ${AWS_REGION} --name ${PARAM_NAME} --with-decryption --query Parameter.Value --output text > .env.production\",
     \"docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --remove-orphans\",
-    \"docker compose -f docker-compose.prod.yml ps\"
+    \"docker compose -f docker-compose.prod.yml --env-file .env.production restart caddy\",
+    \"docker compose -f docker-compose.prod.yml --env-file .env.production ps\"
   ]" \
   --query 'Command.CommandId' \
   --output text)"

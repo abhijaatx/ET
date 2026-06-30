@@ -25,14 +25,26 @@ if [[ -z "${API_ORIGIN_DOMAIN}" ]]; then
   API_ORIGIN_DOMAIN="$(aws ec2 describe-instances \
     --region "${AWS_REGION}" \
     --filters "Name=tag:Project,Values=${PROJECT_NAME}" "Name=instance-state-name,Values=running" \
-    --query 'Reservations[0].Instances[0].PublicIpAddress' \
+    --query 'Reservations[0].Instances[0].PublicDnsName' \
     --output text)"
 fi
 
 if [[ -z "${API_ORIGIN_DOMAIN}" || "${API_ORIGIN_DOMAIN}" == "None" ]]; then
-  echo "Could not discover the API EC2 public IP. Set API_ORIGIN_DOMAIN." >&2
-  exit 1
+  API_ORIGIN_IP="$(aws ec2 describe-instances \
+    --region "${AWS_REGION}" \
+    --filters "Name=tag:Project,Values=${PROJECT_NAME}" "Name=instance-state-name,Values=running" \
+    --query 'Reservations[0].Instances[0].PublicIpAddress' \
+    --output text)"
+
+  if [[ -z "${API_ORIGIN_IP}" || "${API_ORIGIN_IP}" == "None" ]]; then
+    echo "Could not discover the API EC2 public DNS name. Set API_ORIGIN_DOMAIN." >&2
+    exit 1
+  fi
+
+  API_ORIGIN_DOMAIN="ec2-${API_ORIGIN_IP//./-}.${AWS_REGION}.compute.amazonaws.com"
 fi
+
+echo "Using API origin ${API_ORIGIN_DOMAIN}."
 
 echo "Building static frontend..."
 NEXT_OUTPUT=export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-}" npm run build --workspace apps/web
