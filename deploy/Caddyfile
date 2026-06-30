@@ -8,7 +8,7 @@
 	@api path /api/* /health
 	reverse_proxy @api api:3001
 
-	reverse_proxy web:3000
+	respond "ET API origin" 404
 
 	header {
 		X-Content-Type-Options nosniff

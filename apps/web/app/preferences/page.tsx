@@ -18,7 +18,7 @@ import { TopNav } from "../../components/TopNav";
 import { Sidebar } from "../../components/Sidebar";
 import { SlideOver } from "../../components/SlideOver";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface Interest {
   topicSlug: string;

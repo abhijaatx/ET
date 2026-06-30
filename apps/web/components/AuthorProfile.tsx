@@ -72,7 +72,7 @@ const DUMMY_PROFILES: Record<string, Author> = {
   }
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export function AuthorProfile({ authorId }: { authorId: string }) {
   const [author, setAuthor] = useState<Author | null>(null);

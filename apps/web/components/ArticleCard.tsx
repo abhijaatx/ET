@@ -39,7 +39,7 @@ export function ArticleCard({ article, onClick }: ArticleCardProps) {
   const [bookmarked, setBookmarked] = useState(article.isBookmarked ?? false);
   const [copied, setCopied] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
   
   let timeAgo = "Recently";
   try {
@@ -56,7 +56,7 @@ export function ArticleCard({ article, onClick }: ArticleCardProps) {
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}/briefing/${article.storyId}?sourceId=${article.id}`;
+    const shareUrl = `${window.location.origin}/briefing?storyId=${article.storyId}&sourceId=${article.id}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: article.title, url: shareUrl });

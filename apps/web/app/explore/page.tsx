@@ -13,7 +13,7 @@ import { TrendingSidebar } from "../../components/TrendingSidebar";
 import { SlideOver } from "../../components/SlideOver";
 import { PremiumAd } from "../../components/PremiumAd";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const STOCK_PHOTO = "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
 
 interface TrendingItem {
@@ -146,7 +146,7 @@ export default function ExplorePage() {
                 {heroItem && (
                   <div 
                     className="xl:col-span-8 group cursor-pointer space-y-6"
-                    onClick={() => router.push(`/briefing/${heroItem.id}`)}
+                    onClick={() => router.push(`/briefing?storyId=${heroItem.id}`)}
                   >
                     <div className="relative overflow-hidden bg-et-section rounded-[32px] border border-et-border aspect-[16/9] shadow-xl">
                       <SafeImage 
@@ -187,7 +187,7 @@ export default function ExplorePage() {
                     {sideItems.map((item, i) => (
                       <div 
                         key={item.id}
-                        onClick={() => router.push(`/briefing/${item.id}`)}
+                        onClick={() => router.push(`/briefing?storyId=${item.id}`)}
                         className="group cursor-pointer flex gap-5 items-start"
                       >
                         <div className="flex-1 space-y-2">
@@ -229,7 +229,7 @@ export default function ExplorePage() {
                   {secondaryItems.map((item, i) => (
                     <div 
                       key={item.id}
-                      onClick={() => router.push(`/briefing/${item.id}`)}
+                      onClick={() => router.push(`/briefing?storyId=${item.id}`)}
                       className="group cursor-pointer space-y-6"
                     >
                       <div className="aspect-[4/5] overflow-hidden bg-et-section rounded-[32px] border border-et-border shadow-md">
@@ -266,7 +266,7 @@ export default function ExplorePage() {
                    {additionalItems.map((item, i) => (
                      <div 
                         key={item.id}
-                        onClick={() => router.push(`/briefing/${item.id}`)}
+                        onClick={() => router.push(`/briefing?storyId=${item.id}`)}
                         className="flex gap-6 group cursor-pointer items-center"
                      >
                        <div className="w-32 h-32 md:w-40 md:h-40 bg-et-section rounded-[28px] overflow-hidden flex-shrink-0 border border-et-border shadow-sm">

@@ -11,7 +11,7 @@ import {
   CalendarIcon
 } from "@heroicons/react/24/outline";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface Story {
   id: string;
@@ -66,7 +66,7 @@ export default function FollowedStoriesPage() {
           <div className="grid gap-4">
             <AnimatePresence>
               {stories.map((story, i) => (
-                <Link key={story.id} href={`/briefing/${story.id}`}>
+                <Link key={story.id} href={`/briefing?storyId=${story.id}`}>
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}

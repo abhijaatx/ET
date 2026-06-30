@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray, lt, notInArray, or, sql } from "drizzle-or
 import { articleSignals, articles, stories, userEntityAffinity, userTopicInterests, users } from "@myet/db";
 import { db } from "../db";
 import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth";
+import { enqueueOnDemandIngest } from "../queues/ingest";
 import { getFrame } from "../services/frame";
 import { clamp } from "../utils/engagement";
 import type { AppEnv } from "../types/app";
@@ -13,6 +14,12 @@ feedRoutes.get("/feed", optionalAuthMiddleware, async (c) => {
   const user = c.get("user");
   const offset = Number(c.req.query("offset") ?? 0);
   const limit = Number(c.req.query("limit") ?? 20);
+
+  if (offset === 0) {
+    enqueueOnDemandIngest("feed-open").catch((err) => {
+      console.error("[Ingest] Failed to enqueue on-demand feed ingest:", err);
+    });
+  }
 
   // Simple chronological feed: latest AI-processed articles for everyone
   const latest = await db

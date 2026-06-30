@@ -1,21 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useChat } from "ai/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TopNav } from "../../../components/TopNav";
-import { Sidebar } from "../../../components/Sidebar";
-import { SlideOver } from "../../../components/SlideOver";
-import { LanguageSelector } from "../../../components/LanguageSelector";
-import { useAuthorProfile } from "../../../context/AuthorProfileContext";
-import { PremiumAd } from "../../../components/PremiumAd";
-import { BriefingStoryArc, type StoryArcData } from "../../../components/BriefingStoryArc";
+import { TopNav } from "../../components/TopNav";
+import { Sidebar } from "../../components/Sidebar";
+import { SlideOver } from "../../components/SlideOver";
+import { LanguageSelector } from "../../components/LanguageSelector";
+import { useAuthorProfile } from "../../context/AuthorProfileContext";
+import { PremiumAd } from "../../components/PremiumAd";
+import { BriefingStoryArc, type StoryArcData } from "../../components/BriefingStoryArc";
 import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star, Globe, X } from "lucide-react";
-import { useAuth } from "../../../context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useAuth } from "../../context/AuthContext";
 
 const STOCK_PHOTO = "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+function getLegacyStoryIdFromPath() {
+  if (typeof window === "undefined") return null;
+  const match = window.location.pathname.match(/^\/briefing\/([^/?#]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
 
 type BriefingDocument = {
   story_id: string;
@@ -67,9 +73,8 @@ export default function BriefingPage() {
   const { openProfile } = useAuthorProfile();
   const { user } = useAuth();
   const router = useRouter();
-  const params = useParams<{ story_id: string }>();
   const searchParams = useSearchParams();
-  const storyId = params.story_id;
+  const storyId = searchParams.get("storyId") ?? searchParams.get("story_id") ?? getLegacyStoryIdFromPath() ?? "";
   const sourceId = searchParams.get("sourceId");
 
   const [articles, setArticles] = useState<ArticleItem[]>([]);
@@ -99,6 +104,7 @@ export default function BriefingPage() {
   const articleTranslationRequestRef = useRef(0);
 
   useEffect(() => {
+    if (!storyId) return;
     if (currentLanguage === "en") {
       vernacularRequestRef.current += 1;
       setVernacularBriefing(null);
@@ -158,6 +164,8 @@ export default function BriefingPage() {
   }, [storyId, currentLanguage]);
 
   useEffect(() => {
+    if (!storyId) return;
+
     const fetchFollowStatus = async () => {
       try {
         const res = await fetch("/api/stories/followed", { credentials: "include" });
@@ -172,6 +180,8 @@ export default function BriefingPage() {
   }, [storyId]);
 
   const toggleFollow = async () => {
+    if (!storyId) return;
+
     if (!user) {
       router.push("/login");
       return;
@@ -192,6 +202,11 @@ export default function BriefingPage() {
   };
 
   useEffect(() => {
+    if (!storyId) {
+      setArticlesLoaded(true);
+      return;
+    }
+
     const fetchArticles = async () => {
       try {
         const res = await fetch(`/api/articles/${storyId}`, { credentials: "include" });
@@ -280,6 +295,8 @@ export default function BriefingPage() {
   }, [activeSource, currentLanguage, vernacularArticles]);
 
   useEffect(() => {
+    if (!storyId) return;
+
     const fetchBriefing = async () => {
       try {
         setBriefingError(null);
@@ -348,7 +365,7 @@ export default function BriefingPage() {
 
   const { messages, input, handleInputChange, handleSubmit, setInput, isLoading } =
     useChat({
-      api: `/api/briefing/${storyId}/ask`,
+      api: `${API_URL}/api/briefing/${storyId || "missing"}/ask`,
     });
 
   // Focus Time Tracking (Heartbeat)
@@ -359,8 +376,7 @@ export default function BriefingPage() {
       const targetArticleId = sourceId || briefing?.source_articles?.[0]?.id || articles?.[0]?.id;
 
       if (targetArticleId && document.visibilityState === "visible") {
-        const url = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-        fetch(`${url}/api/signals`, {
+        fetch(`${API_URL}/api/signals`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",

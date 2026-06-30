@@ -28,7 +28,7 @@ type FeedArticle = {
   isBookmarked?: boolean;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function formatTime(value: string | null) {
   if (!value) return "Recently";
@@ -149,12 +149,12 @@ export default function NotificationsPage() {
     const storyId = activeArticle.storyId;
     const articleId = activeArticle.id;
     setActiveArticle(null);
-    router.push(`/briefing/${storyId}?sourceId=${articleId}`);
+    router.push(`/briefing?storyId=${storyId}&sourceId=${articleId}`);
   };
 
   const handleShare = async () => {
     if (!activeArticle) return;
-    const shareUrl = `${window.location.origin}/briefing/${activeArticle.storyId}?sourceId=${activeArticle.id}`;
+    const shareUrl = `${window.location.origin}/briefing?storyId=${activeArticle.storyId}&sourceId=${activeArticle.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);

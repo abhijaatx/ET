@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { MagnifyingGlassIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { useAuthorProfile } from "../context/AuthorProfileContext";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface Author {
   id: string;
@@ -95,7 +95,7 @@ export function TrendingSidebar() {
               <div 
                 key={i} 
                 className="px-6 py-4 hover:bg-et-section cursor-pointer transition-colors group"
-                onClick={() => router.push(`/briefing/${item.id}`)}
+                onClick={() => router.push(`/briefing?storyId=${item.id}`)}
               >
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-[10px] font-extrabold text-et-red uppercase tracking-widest">{item.category}</p>

@@ -22,7 +22,7 @@ import { PremiumAd } from "../../components/PremiumAd";
 import { TopNav } from "../../components/TopNav";
 import { useAuth } from "../../context/AuthContext";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface DashboardData {
   user: {
@@ -282,7 +282,7 @@ export default function ProfilePage() {
                <h3 className="text-lg font-serif font-bold text-et-headline px-2">Followed Stories</h3>
                <div className="space-y-3">
                  {data.followedStories.map(story => (
-                   <Link key={story.id} href={`/briefing/${story.id}`}>
+                   <Link key={story.id} href={`/briefing?storyId=${story.id}`}>
                      <div className="bg-white rounded-2xl p-5 border border-et-divider flex justify-between items-center group cursor-pointer hover:shadow-md transition-all">
                        <div><div className="text-sm font-serif font-bold group-hover:text-et-red">{story.headline}</div><div className="text-[10px] font-bold text-et-meta uppercase tracking-widest mt-1 opacity-60">{story.articleCount} Current Insights</div></div>
                        <div className="p-2 bg-et-section rounded-xl group-hover:bg-et-red group-hover:text-white transition-all"><ChevronRightIcon className="w-4 h-4" /></div>

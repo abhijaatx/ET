@@ -30,7 +30,7 @@ type FeedArticle = {
   imageUrl?: string | null;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function formatTime(value: string | null) {
   if (!value) return "Recently";
@@ -167,6 +167,15 @@ export default function FeedPage() {
         // First run — just record the baseline ID
         if (!latestKnownId.current) {
           latestKnownId.current = latestId;
+          if (articlesRef.current.length === 0) {
+            const feedRes = await fetch(`${API_URL}/api/feed?offset=0&limit=20`, { credentials: "include" });
+            if (!feedRes.ok) return;
+            const feedData = await feedRes.json() as { articles: FeedArticle[] };
+            setArticles(feedData.articles);
+            offsetRef.current = feedData.articles.length;
+            hasMoreRef.current = feedData.articles.length > 0;
+            setHasMore(feedData.articles.length > 0);
+          }
           return;
         }
 
@@ -254,7 +263,7 @@ export default function FeedPage() {
     const storyId = activeArticle.storyId;
     const articleId = activeArticle.id;
     setActiveArticle(null);
-    router.push(`/briefing/${storyId}?sourceId=${articleId}`);
+    router.push(`/briefing?storyId=${storyId}&sourceId=${articleId}`);
   };
 
   const paragraphs = useMemo(() => {
