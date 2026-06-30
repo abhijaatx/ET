@@ -58,7 +58,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-myet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-myet}
       REDIS_URL: redis://redis:6379
       NODE_OPTIONS: --dns-result-order=ipv4first
-    command: ["sh", "-c", "npm run db:migrate --workspace apps/api && node apps/api/dist/server.js"]
+    command: ["sh", "-c", "npm run db:migrate --workspace apps/api && ./node_modules/.bin/tsx apps/api/src/server.ts"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,7 +82,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-myet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-myet}
       REDIS_URL: redis://redis:6379
       NODE_OPTIONS: --dns-result-order=ipv4first
-    command: ["node", "apps/api/dist/worker.js"]
+    command: ["./node_modules/.bin/tsx", "apps/api/src/worker.ts"]
     depends_on:
       api:
         condition: service_healthy

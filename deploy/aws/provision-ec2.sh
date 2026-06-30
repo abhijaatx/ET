@@ -15,6 +15,12 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+POSTGRES_PASSWORD_VALUE="$(awk -F= '/^POSTGRES_PASSWORD=/{print substr($0, index($0, "=") + 1)}' "${ENV_FILE}")"
+if [[ -z "${POSTGRES_PASSWORD_VALUE}" || ! "${POSTGRES_PASSWORD_VALUE}" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+  echo "POSTGRES_PASSWORD in ${ENV_FILE} must use only URL-safe characters: A-Z a-z 0-9 . _ ~ -" >&2
+  exit 1
+fi
+
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 BUCKET="${BACKUP_BUCKET:-${PROJECT_NAME}-prod-backups-${ACCOUNT_ID}-${AWS_REGION}}"
 PARAM_NAME="${PARAM_NAME:-/${PROJECT_NAME}/prod/env}"
@@ -113,8 +119,27 @@ cat > "${USER_DATA}" <<EOF
 #!/bin/bash
 set -euxo pipefail
 dnf update -y
-dnf install -y docker git awscli cronie
-dnf install -y docker-compose-plugin || true
+dnf install -y docker git awscli cronie curl
+arch="\$(uname -m)"
+case "\${arch}" in
+  aarch64|arm64) compose_arch="aarch64"; buildx_arch="arm64" ;;
+  x86_64|amd64) compose_arch="x86_64"; buildx_arch="amd64" ;;
+  *) echo "Unsupported architecture for Docker Compose: \${arch}" >&2; exit 1 ;;
+esac
+if ! dnf install -y docker-compose-plugin; then
+  mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins
+  curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-\${compose_arch}" \
+    -o /usr/local/lib/docker/cli-plugins/docker-compose
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+fi
+buildx_version="\$(curl -fsSL https://api.github.com/repos/docker/buildx/releases/latest | sed -n 's/.*\"tag_name\": \"\\(v[^\"]*\\)\".*/\\1/p' | head -n 1)"
+curl -fsSL "https://github.com/docker/buildx/releases/download/\${buildx_version}/buildx-\${buildx_version}.linux-\${buildx_arch}" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+ln -sf /usr/local/lib/docker/cli-plugins/docker-buildx /usr/libexec/docker/cli-plugins/docker-buildx
+docker compose version
+docker buildx version
 systemctl enable --now docker
 systemctl enable --now crond
 
