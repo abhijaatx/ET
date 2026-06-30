@@ -1,7 +1,7 @@
 # ET AI News Briefing Platform
 
 Live: [https://d48sqpdprdepm.cloudfront.net](https://d48sqpdprdepm.cloudfront.net)
-GitHub: [https://github.com/abhijaatx/ET](https://github.com/abhijaatx/ET)
+
 
 ET is a full-stack AI news platform for Economic Times-style financial news. It ingests articles, groups them into stories, generates briefings, and lets users ask AI questions grounded in the retrieved article context.
 
