@@ -46,6 +46,9 @@ const GROQ_MIN_INTERVAL_MS = readIntervalMs(env.GROQ_MIN_INTERVAL_MS, 25000);
 const GROQ_COOLDOWN_MS = readIntervalMs(env.GROQ_COOLDOWN_MS, 120000);
 const GROQ_SLOT_KEY = "ai:groq:next_at";
 const GROQ_COOLDOWN_KEY = "ai:groq:cooldown_until";
+const GROQ_INTERACTIVE_PENDING_KEY = "ai:groq:interactive_pending";
+
+type GroqPriority = "interactive" | "background";
 
 const CLAIM_AI_SLOT_SCRIPT = `
 local key = KEYS[1]
@@ -62,9 +65,22 @@ redis.call("SET", key, now + wait + interval, "PX", ttl)
 return wait
 `;
 
+const RELEASE_INTERACTIVE_PENDING_SCRIPT = `
+local value = tonumber(redis.call("DECR", KEYS[1]) or "0")
+if value <= 0 then
+  redis.call("DEL", KEYS[1])
+  return 0
+end
+return value
+`;
+
 function readIntervalMs(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function defaultGroqPriority(): GroqPriority {
+  return env.AI_REQUEST_PRIORITY === "background" ? "background" : "interactive";
 }
 
 async function sleepWithHeartbeat(durationMs: number, onHeartbeat?: () => Promise<void>) {
@@ -127,6 +143,49 @@ async function acquireSharedGroqSlot(onHeartbeat?: () => Promise<void>) {
     await sleepWithHeartbeat(GROQ_MIN_INTERVAL_MS - timeSinceLast, onHeartbeat);
   }
   lastGroqFallbackCallTime = Date.now();
+}
+
+async function markInteractiveGroqPending(priority: GroqPriority) {
+  if (priority !== "interactive") return false;
+
+  try {
+    await redis.incr(GROQ_INTERACTIVE_PENDING_KEY);
+    await redis.expire(GROQ_INTERACTIVE_PENDING_KEY, 15 * 60);
+    return true;
+  } catch (error: any) {
+    console.warn(`[AI-Groq] Interactive priority marker unavailable: ${error?.message ?? error}`);
+    return false;
+  }
+}
+
+async function clearInteractiveGroqPending(marked: boolean) {
+  if (!marked) return;
+
+  try {
+    await redis.eval(RELEASE_INTERACTIVE_PENDING_SCRIPT, 1, GROQ_INTERACTIVE_PENDING_KEY);
+  } catch (error: any) {
+    console.warn(`[AI-Groq] Interactive priority cleanup failed: ${error?.message ?? error}`);
+  }
+}
+
+async function waitForInteractiveGroqPriority(priority: GroqPriority, onHeartbeat?: () => Promise<void>) {
+  if (priority !== "background") return;
+
+  while (true) {
+    let pending = 0;
+    try {
+      pending = Number(await redis.get(GROQ_INTERACTIVE_PENDING_KEY) ?? "0");
+    } catch (error: any) {
+      console.warn(`[AI-Groq] Priority check failed: ${error?.message ?? error}`);
+      return;
+    }
+
+    if (pending <= 0) return;
+
+    const waitTime = Math.min(Math.max(GROQ_MIN_INTERVAL_MS, 1000), 30000);
+    console.log(`[AI-Groq] Interactive request pending; background waiting ${Math.ceil(waitTime / 1000)}s...`);
+    await sleepWithHeartbeat(waitTime, onHeartbeat);
+  }
 }
 
 async function markGroqRateLimited() {
@@ -249,8 +308,13 @@ export async function callNvidiaFast<T>(fn: () => Promise<T>): Promise<T> {
  * Groq AI queue shared by every container through Redis. Use for all Groq
  * completions, including background jobs and user-triggered streams.
  */
-export async function callGroqProvider<T>(fn: () => Promise<T>, onHeartbeat?: () => Promise<void>): Promise<T> {
+export async function callGroqProvider<T>(
+  fn: () => Promise<T>,
+  onHeartbeat?: () => Promise<void>,
+  priority: GroqPriority = defaultGroqPriority()
+): Promise<T> {
   const currentLink = groqQueue;
+  const interactivePending = markInteractiveGroqPending(priority);
 
   const nextLink = (async () => {
     let isWaiting = true;
@@ -265,6 +329,7 @@ export async function callGroqProvider<T>(fn: () => Promise<T>, onHeartbeat?: ()
 
       return await withRetry(async () => {
         await waitForGroqCooldown(onHeartbeat);
+        await waitForInteractiveGroqPriority(priority, onHeartbeat);
         await acquireSharedGroqSlot(onHeartbeat);
 
         try {
@@ -279,6 +344,8 @@ export async function callGroqProvider<T>(fn: () => Promise<T>, onHeartbeat?: ()
       }, { retries: 5, baseDelayMs: 2000 });
     } catch (e) {
       throw e;
+    } finally {
+      await clearInteractiveGroqPending(await interactivePending);
     }
   })();
 
