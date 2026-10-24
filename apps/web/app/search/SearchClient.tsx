@@ -51,7 +51,7 @@ export default function SearchClient() {
       <SlideOver
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="The EconomicTimes"
+        title="News Navigator"
         side="left"
       >
         <Sidebar />

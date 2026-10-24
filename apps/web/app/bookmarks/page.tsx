@@ -211,7 +211,7 @@ export default function BookmarksPage() {
       <SlideOver
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="The EconomicTimes"
+        title="News Navigator"
         side="left"
       >
         <Sidebar />

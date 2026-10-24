@@ -32,7 +32,7 @@ export type VernacularStoryArc = {
 const LANGUAGE_META: Record<string, { name: string; context: string }> = {
   hi: { 
     name: "Hindi", 
-    context: "Focus on North Indian retail investors, impact on daily household budgets, gold prices, and local real estate. Use high-impact, journalistic Hindi used in mainstream financial papers like ET Hindi."
+    context: "Focus on North Indian retail investors, impact on daily household budgets, gold prices, and local real estate. Use clear, high-impact Hindi suitable for financial news."
   },
   ta: { 
     name: "Tamil", 
@@ -163,7 +163,7 @@ export async function generateVernacularBriefing(params: {
   const meta = LANGUAGE_META[params.lang];
   if (!meta) throw new Error(`Unsupported language: ${params.lang}`);
 
-  const systemPrompt = `You are a specialist cultural business correspondent for The Economic Times, expert in translating complex global and Indian economic trends for a ${meta.name} audience.
+  const systemPrompt = `You are a specialist cultural business correspondent for News Navigator, expert in translating complex global and Indian economic trends for a ${meta.name} audience.
 
 Your goal is to provide a "Context-Aware Transcreation" of the provided English briefing. Do NOT perform a literal translation. 
 
@@ -201,7 +201,7 @@ export async function generateVernacularStoryArc(params: {
   const meta = LANGUAGE_META[params.lang];
   if (!meta) throw new Error(`Unsupported language: ${params.lang}`);
 
-  const systemPrompt = `You are a specialist cultural business correspondent for The Economic Times, expert in translating complex global and Indian economic trends for a ${meta.name} audience.
+  const systemPrompt = `You are a specialist cultural business correspondent for News Navigator, expert in translating complex global and Indian economic trends for a ${meta.name} audience.
 
 Your goal is to provide a "Context-Aware Transcreation" of the provided English Story Arc. 
 
@@ -238,7 +238,7 @@ export async function translateArticle(params: {
   const meta = LANGUAGE_META[params.lang];
   if (!meta) throw new Error(`Unsupported language: ${params.lang}`);
 
-  const systemPrompt = `You are a professional business translator for The Economic Times. 
+  const systemPrompt = `You are a professional business translator for News Navigator.
 Translate the following article into ${meta.name}.
 Maintain a professional, journalistic tone. 
 Ensure financial terms are accurately translated or explained in context.

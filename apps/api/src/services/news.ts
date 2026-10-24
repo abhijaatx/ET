@@ -8,45 +8,49 @@ export type RawArticle = {
   content: string;
   url: string;
   imageUrl?: string | null;
-  source: "economictimes" | "newsapi" | "gnews" | "techcrunch";
+  source: string;
   author: string | null;
   publishedAt: Date | null;
   category?: string;
 };
 
-const rssFeeds = [
+type RssItemFields = { source?: string };
+
+const rssFeeds: { url: string; category: string; source: string }[] = [
   // ── The Economic Times ──────────────────────────────────────────────
-  { url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms", category: "top-news" },
-  { url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: "markets" },
-  { url: "https://economictimes.indiatimes.com/industry/rssfeeds/13352306.cms", category: "business" },
-  { url: "https://economictimes.indiatimes.com/tech/rssfeeds/13358319.cms", category: "technology" },
+  { url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms", category: "top-news", source: "Economic Times" },
+  { url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: "markets", source: "Economic Times" },
+  { url: "https://economictimes.indiatimes.com/industry/rssfeeds/13352306.cms", category: "business", source: "Economic Times" },
+  { url: "https://economictimes.indiatimes.com/tech/rssfeeds/13358319.cms", category: "technology", source: "Economic Times" },
 
   // ── Google News (India-focused) ─────────────────────────────────────
-  { url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-IN&gl=IN&ceid=IN:en", category: "world" },
-  { url: "https://news.google.com/rss/headlines/section/topic/NATION?hl=en-IN&gl=IN&ceid=IN:en", category: "policy" },
-  { url: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-IN&gl=IN&ceid=IN:en", category: "business" },
-  { url: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-IN&gl=IN&ceid=IN:en", category: "technology" },
-  { url: "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-IN&gl=IN&ceid=IN:en", category: "science" },
-  { url: "https://news.google.com/rss/search?q=finance+stock+market&hl=en-IN&gl=IN&ceid=IN:en", category: "markets" },
+  { url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-IN&gl=IN&ceid=IN:en", category: "world", source: "Google News" },
+  { url: "https://news.google.com/rss/headlines/section/topic/NATION?hl=en-IN&gl=IN&ceid=IN:en", category: "policy", source: "Google News" },
+  { url: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-IN&gl=IN&ceid=IN:en", category: "business", source: "Google News" },
+  { url: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-IN&gl=IN&ceid=IN:en", category: "technology", source: "Google News" },
+  { url: "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-IN&gl=IN&ceid=IN:en", category: "science", source: "Google News" },
+  { url: "https://news.google.com/rss/search?q=finance+stock+market&hl=en-IN&gl=IN&ceid=IN:en", category: "markets", source: "Google News" },
 
   // ── BBC (World & Tech) ──────────────────────────────────────────────
-  { url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "world" },
-  { url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: "business" },
-  { url: "https://feeds.bbci.co.uk/news/technology/rss.xml", category: "technology" },
-  { url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", category: "science" },
-  { url: "https://feeds.bbci.co.uk/news/health/rss.xml", category: "health" },
-  { url: "https://feeds.bbci.co.uk/news/politics/rss.xml", category: "policy" },
+  { url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "world", source: "BBC News" },
+  { url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: "business", source: "BBC News" },
+  { url: "https://feeds.bbci.co.uk/news/technology/rss.xml", category: "technology", source: "BBC News" },
+  { url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", category: "science", source: "BBC News" },
+  { url: "https://feeds.bbci.co.uk/news/health/rss.xml", category: "health", source: "BBC News" },
+  { url: "https://feeds.bbci.co.uk/news/politics/rss.xml", category: "policy", source: "BBC News" },
 
   // ── Tech News ───────────────────────────────────────────────────────
-  { url: "https://techcrunch.com/feed/", category: "technology" },
-  { url: "https://www.theverge.com/rss/index.xml", category: "technology" },
-  { url: "https://feeds.arstechnica.com/arstechnica/index", category: "technology" },
-  { url: "https://www.wired.com/feed/rss", category: "technology" },
-  { url: "https://feeds.feedburner.com/venturebeat/SZYF", category: "technology" },
-  { url: "https://hnrss.org/frontpage", category: "technology" }, // Hacker News front page
+  { url: "https://techcrunch.com/feed/", category: "technology", source: "TechCrunch" },
+  { url: "https://www.theverge.com/rss/index.xml", category: "technology", source: "The Verge" },
+  { url: "https://feeds.arstechnica.com/arstechnica/index", category: "technology", source: "Ars Technica" },
+  { url: "https://www.wired.com/feed/rss", category: "technology", source: "WIRED" },
+  { url: "https://feeds.feedburner.com/venturebeat/SZYF", category: "technology", source: "VentureBeat" },
+  { url: "https://hnrss.org/frontpage", category: "technology", source: "Hacker News" },
 ];
 
-const parser = new Parser();
+const parser = new Parser<Record<string, never>, RssItemFields>({
+  customFields: { item: ["source"] }
+});
 
 async function fetchNewsApi(category: string, country: string = "us"): Promise<RawArticle[]> {
   if (!env.NEWSAPI_KEY) return [];
@@ -77,7 +81,7 @@ async function fetchNewsApi(category: string, country: string = "us"): Promise<R
     content: article.content ?? article.description ?? "",
     url: article.url,
     imageUrl: article.urlToImage,
-    source: "newsapi",
+    source: article.source.name || "News",
     author: article.author,
     publishedAt: article.publishedAt ? new Date(article.publishedAt) : null,
     category: category
@@ -112,7 +116,7 @@ async function fetchGNews(topic: string = "business", country: string = "in"): P
     content: article.content ?? article.description ?? "",
     url: article.url,
     imageUrl: article.image,
-    source: "gnews",
+    source: article.source.name || "News",
     author: null,
     publishedAt: article.publishedAt ? new Date(article.publishedAt) : null
   }));
@@ -134,7 +138,7 @@ async function fetchRss(): Promise<RawArticle[]> {
           content: item.contentSnippet ?? item.content ?? "",
           url: item.link,
           imageUrl,
-          source: "economictimes",
+          source: item.source?.trim() || feed.source,
           author: item.creator ?? null,
           publishedAt: item.isoDate ? new Date(item.isoDate) : null,
           category: feed.category

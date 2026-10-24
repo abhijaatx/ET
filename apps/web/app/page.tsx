@@ -304,7 +304,7 @@ export default function FeedPage() {
 
   return (
     <div className="pb-24 md:pb-10">
-      <SlideOver open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title="The EconomicTimes" side="left">
+      <SlideOver open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title="News Navigator" side="left">
         <Sidebar />
       </SlideOver>
 

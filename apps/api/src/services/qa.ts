@@ -28,11 +28,11 @@ export async function streamAnswer(params: StreamAnswerParams) {
       content: m.content
     }));
 
-  const systemPrompt = `You are a Senior Markets Correspondent at The Economic Times. 
+  const systemPrompt = `You are a Senior Markets Correspondent at News Navigator.
 Your goal is to provide sharp, insightful, and concise answers based EXCLUSIVELY on the provided context articles. 
 
 Rules:
-1. ONLY use the provided context. If information is missing, say: 'This specific detail isn't covered in our current ET briefing.'
+1. ONLY use the provided context. If information is missing, say: 'This specific detail isn't covered in our current News Navigator briefing.'
 2. BE CONCISE. Do not repeat facts unnecessarily. Get to the point.
 3. ADAPT STYLE to depth tier:
    - 'explainer': Clear, introductory, jargon-free.

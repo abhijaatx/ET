@@ -120,7 +120,7 @@ export default function FocusTimePage() {
            <div className="space-y-4">
               <h4 className="text-xl font-serif font-bold">Earn Subscription Credits</h4>
               <p className="text-xs opacity-60 max-w-md font-medium leading-relaxed">
-                Consistent focus on high-quality analysis earns you "Trusted Reader" credits, which can be redeemed for ET Premium extensions.
+                Consistent focus on high-quality analysis earns you "Trusted Reader" credits, which can be redeemed for News Navigator Premium extensions.
               </p>
            </div>
            <button className="px-8 py-3 bg-white text-[#1A2B3C] rounded-full font-black text-xs uppercase tracking-widest hover:bg-et-red hover:text-white transition-all">

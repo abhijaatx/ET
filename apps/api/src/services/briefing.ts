@@ -54,7 +54,7 @@ export async function generateBriefing(params: {
   try {
     // groqCompletion already goes through the AI queue — no outer wrapper needed
     const text = await groqCompletion(
-      "You are a Lead Intelligence Analyst at The Economic Times. Synthesise the provided articles into a high-stakes 'Deep Briefing'.",
+      "You are a Lead Intelligence Analyst at News Navigator. Synthesise the provided articles into a high-stakes 'Deep Briefing'.",
       `Story context:
 ${context}
 

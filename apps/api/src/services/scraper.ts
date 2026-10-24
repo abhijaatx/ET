@@ -28,7 +28,7 @@ export async function scrapeTechCrunch(): Promise<RawArticle[]> {
           content: content || title,
           url,
           imageUrl: imageUrl || null,
-          source: "techcrunch",
+          source: "TechCrunch",
           author: null,
           publishedAt: new Date(),
           category: "technology"
@@ -69,7 +69,7 @@ export async function scrapeETTech(): Promise<RawArticle[]> {
           content: title,
           url: absUrl,
           imageUrl: imageUrl || null,
-          source: "economictimes",
+          source: "Economic Times",
           author: null,
           publishedAt: new Date(),
           category: "technology"
@@ -118,9 +118,9 @@ export async function deepScrapeArticle(url: string, source: string): Promise<{ 
 
     let content = "";
 
-    if (source === "economictimes" || url.includes("economictimes.indiatimes.com")) {
+    if (["economictimes", "economic times"].includes(source.trim().toLowerCase()) || url.includes("economictimes.indiatimes.com")) {
       content = $(".artText, .article-body, [data-section=\"article-body\"]").text().trim();
-    } else if (source === "techcrunch" || url.includes("techcrunch.com")) {
+    } else if (source.trim().toLowerCase() === "techcrunch" || url.includes("techcrunch.com")) {
       content = $(".article-content, .entry-content, .wp-block-post-content").find("p").text().trim();
     } else if (url.includes("reuters.com")) {
       content = $(".article-body__content__17Yit, [data-testid=\"paragraph-0\"]").parent().text().trim();

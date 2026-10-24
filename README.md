@@ -1,9 +1,9 @@
-# ET AI News Briefing Platform
+# News Navigator
 
-Live: [https://d48sqpdprdepm.cloudfront.net](https://d48sqpdprdepm.cloudfront.net)
+Live: [https://dg032nlrjbaht.cloudfront.net](https://dg032nlrjbaht.cloudfront.net)
 
 
-ET is a full-stack AI news platform for Economic Times-style financial news. It ingests articles, groups them into stories, generates briefings, and lets users ask AI questions grounded in the retrieved article context.
+News Navigator is a multi-source AI news platform. It ingests articles, groups them into stories, generates briefings, and lets users ask AI questions grounded in the retrieved article context.
 
 ## Features
 

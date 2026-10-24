@@ -440,7 +440,7 @@ export default function BriefingPage() {
       <SlideOver
         open={isAppDrawerOpen}
         onClose={() => setIsAppDrawerOpen(false)}
-        title="The EconomicTimes"
+        title="News Navigator"
         side="left"
       >
         <Sidebar />

@@ -205,7 +205,7 @@ export default function NotificationsPage() {
       <SlideOver
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="The EconomicTimes"
+        title="News Navigator"
         side="left"
       >
         <Sidebar />

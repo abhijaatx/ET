@@ -32,7 +32,7 @@ app.onError((err, c) => {
   return c.json({ error: "Internal Server Error", message: err.message }, 500);
 });
 
-app.get("/", (c) => c.text("The Economic Times - AI Briefing API is running."));
+app.get("/", (c) => c.text("News Navigator API is running."));
 app.get("/health", (c) => c.json({ ok: true }));
 
 app.route("/api/auth", authRoutes);

@@ -102,7 +102,7 @@ export default function ExplorePage() {
       <SlideOver
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="The EconomicTimes"
+        title="News Navigator"
         side="left"
       >
         <Sidebar />
@@ -352,7 +352,7 @@ export default function ExplorePage() {
             </div>
          </div>
          <div className="max-w-[1440px] mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-6 text-[11px] font-black uppercase tracking-[0.3em] text-et-meta italic">
-            <span>© 2026 THE ECONOMIC TIMES NAVIGATOR SYSTEM</span>
+            <span>© 2026 NEWS NAVIGATOR</span>
             <div className="flex gap-10">
                <span className="hover:text-et-red cursor-pointer cursor-not-allowed opacity-50">Legal</span>
                <span className="hover:text-et-red cursor-pointer cursor-not-allowed opacity-50">Sitemap</span>

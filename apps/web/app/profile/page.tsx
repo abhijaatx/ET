@@ -82,7 +82,7 @@ export default function ProfilePage() {
         <SlideOver
           open={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
-          title="The EconomicTimes"
+          title="News Navigator"
           side="left"
         >
           <Sidebar />
@@ -101,7 +101,7 @@ export default function ProfilePage() {
               href="/login"
               className="block w-full py-4 bg-et-headline text-white rounded-full font-bold uppercase tracking-widest text-[11px] hover:bg-et-red transition-all shadow-lg shadow-et-red/10"
             >
-              Sign In to EconomicTimes
+              Sign In to News Navigator
             </Link>
             <Link 
               href="/register"
@@ -152,7 +152,7 @@ export default function ProfilePage() {
       <SlideOver
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="The EconomicTimes"
+        title="News Navigator"
         side="left"
       >
         <Sidebar />

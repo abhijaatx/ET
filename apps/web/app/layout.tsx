@@ -6,6 +6,7 @@ import { MobileNav } from "../components/MobileNav";
 
 export const metadata: Metadata = {
   title: "News Navigator",
+  applicationName: "News Navigator",
   description: "AI-native financial news in a social-first interface"
 };
 

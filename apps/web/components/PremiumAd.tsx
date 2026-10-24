@@ -15,7 +15,7 @@ interface PremiumAdProps {
 const STOCK_ADS = {
   premium: {
     title: "Unleash Your Economic Edge",
-    description: "Get exclusive insights, deep-dive reports, and expert analysis with ET Premium.",
+    description: "Get exclusive insights, deep-dive reports, and expert analysis with News Navigator Premium.",
     image: "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg",
     cta: "Explore Premium"
   },
@@ -106,7 +106,7 @@ export function PremiumAd({
       </div>
       <div className="flex-1 space-y-4">
         <div className="space-y-1">
-          <div className="text-[10px] font-black uppercase tracking-widest text-et-red">ET Discovery Partner</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-et-red">News Navigator Premium</div>
           <h3 className="text-2xl font-serif font-black text-et-headline group-hover:text-et-red transition-colors leading-tight">
             {displayTitle}
           </h3>
@@ -118,7 +118,7 @@ export function PremiumAd({
            <button className="px-6 py-2 bg-et-headline text-white rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-et-red transition-all">
              {displayCta}
            </button>
-           <span className="text-[10px] font-bold text-et-meta uppercase tracking-widest opacity-40 italic">Economic Times Verified Partner</span>
+           <span className="text-[10px] font-bold text-et-meta uppercase tracking-widest opacity-40 italic">News Navigator Verified Partner</span>
         </div>
       </div>
     </motion.div>
