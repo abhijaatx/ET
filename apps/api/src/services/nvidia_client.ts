@@ -4,7 +4,7 @@ import { redis } from "../redis";
 import { withRetry } from "../utils/retry";
 
 export const nvidia = new OpenAI({
-  apiKey: env.NVIDIA_API_KEY,
+  apiKey: env.NVIDIA_API_KEY || "missing",
   baseURL: "https://integrate.api.nvidia.com/v1",
 });
 
@@ -34,21 +34,20 @@ let lastUserCallTime = 0;
 const USER_MIN_INTERVAL_MS = 2000; // 2s between user-facing requests
 
 // ============================================================
-// GROQ QUEUE: Shared across API and worker containers through Redis.
-// The free/low-cost Groq tier is token-per-minute constrained, so a
-// process-local queue is not enough once Docker Compose runs multiple
-// Node processes.
+// BEDROCK QUEUE: Shared across API and worker containers through Redis.
+// A shared queue keeps API and worker requests within the configured
+// Bedrock rate limit across the Docker Compose processes.
 // ============================================================
-let groqQueue: Promise<any> = Promise.resolve();
-let lastGroqFallbackCallTime = 0;
-let groqPauseUntil = 0;
-const GROQ_MIN_INTERVAL_MS = readIntervalMs(env.GROQ_MIN_INTERVAL_MS, 25000);
-const GROQ_COOLDOWN_MS = readIntervalMs(env.GROQ_COOLDOWN_MS, 120000);
-const GROQ_SLOT_KEY = "ai:groq:next_at";
-const GROQ_COOLDOWN_KEY = "ai:groq:cooldown_until";
-const GROQ_INTERACTIVE_PENDING_KEY = "ai:groq:interactive_pending";
+let bedrockQueue: Promise<any> = Promise.resolve();
+let lastBedrockFallbackCallTime = 0;
+let bedrockPauseUntil = 0;
+const BEDROCK_MIN_INTERVAL_MS = readIntervalMs(env.BEDROCK_MIN_INTERVAL_MS, 1000);
+const BEDROCK_COOLDOWN_MS = readIntervalMs(env.BEDROCK_COOLDOWN_MS, 120000);
+const BEDROCK_SLOT_KEY = "ai:bedrock:next_at";
+const BEDROCK_COOLDOWN_KEY = "ai:bedrock:cooldown_until";
+const BEDROCK_INTERACTIVE_PENDING_KEY = "ai:bedrock:interactive_pending";
 
-type GroqPriority = "interactive" | "background";
+type BedrockPriority = "interactive" | "background";
 
 const CLAIM_AI_SLOT_SCRIPT = `
 local key = KEYS[1]
@@ -79,7 +78,7 @@ function readIntervalMs(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function defaultGroqPriority(): GroqPriority {
+function defaultBedrockPriority(): BedrockPriority {
   return env.AI_REQUEST_PRIORITY === "background" ? "background" : "interactive";
 }
 
@@ -101,104 +100,104 @@ async function sleepWithHeartbeat(durationMs: number, onHeartbeat?: () => Promis
   }
 }
 
-async function waitForGroqCooldown(onHeartbeat?: () => Promise<void>) {
+async function waitForBedrockCooldown(onHeartbeat?: () => Promise<void>) {
   let sharedPauseUntil = 0;
   try {
-    sharedPauseUntil = Number(await redis.get(GROQ_COOLDOWN_KEY) ?? "0");
+    sharedPauseUntil = Number(await redis.get(BEDROCK_COOLDOWN_KEY) ?? "0");
   } catch (error: any) {
-    console.warn(`[AI-Groq] Shared cooldown check failed: ${error?.message ?? error}`);
+    console.warn(`[AI-Bedrock] Shared cooldown check failed: ${error?.message ?? error}`);
   }
 
-  const waitTime = Math.max(groqPauseUntil, sharedPauseUntil) - Date.now();
+  const waitTime = Math.max(bedrockPauseUntil, sharedPauseUntil) - Date.now();
   if (waitTime > 0) {
-    console.warn(`[AI-Groq] Cooldown active. Waiting ${Math.ceil(waitTime / 1000)}s...`);
+    console.warn(`[AI-Bedrock] Cooldown active. Waiting ${Math.ceil(waitTime / 1000)}s...`);
     await sleepWithHeartbeat(waitTime, onHeartbeat);
   }
 }
 
-async function acquireSharedGroqSlot(onHeartbeat?: () => Promise<void>) {
-  if (GROQ_MIN_INTERVAL_MS <= 0) return;
+async function acquireSharedBedrockSlot(onHeartbeat?: () => Promise<void>) {
+  if (BEDROCK_MIN_INTERVAL_MS <= 0) return;
 
   try {
-    const ttlMs = Math.max(GROQ_MIN_INTERVAL_MS * 8, 60000);
+    const ttlMs = Math.max(BEDROCK_MIN_INTERVAL_MS * 8, 60000);
     const waitResult = await redis.eval(
       CLAIM_AI_SLOT_SCRIPT,
       1,
-      GROQ_SLOT_KEY,
-      String(GROQ_MIN_INTERVAL_MS),
+      BEDROCK_SLOT_KEY,
+      String(BEDROCK_MIN_INTERVAL_MS),
       String(ttlMs)
     );
     const waitTime = Math.max(0, Number(waitResult) || 0);
     if (waitTime > 0) {
-      console.log(`[AI-Groq] Shared throttle waiting ${Math.ceil(waitTime / 1000)}s...`);
+      console.log(`[AI-Bedrock] Shared throttle waiting ${Math.ceil(waitTime / 1000)}s...`);
       await sleepWithHeartbeat(waitTime, onHeartbeat);
     }
     return;
   } catch (error: any) {
-    console.warn(`[AI-Groq] Redis throttle unavailable; using process-local delay: ${error?.message ?? error}`);
+    console.warn(`[AI-Bedrock] Redis throttle unavailable; using process-local delay: ${error?.message ?? error}`);
   }
 
-  const timeSinceLast = Date.now() - lastGroqFallbackCallTime;
-  if (timeSinceLast < GROQ_MIN_INTERVAL_MS) {
-    await sleepWithHeartbeat(GROQ_MIN_INTERVAL_MS - timeSinceLast, onHeartbeat);
+  const timeSinceLast = Date.now() - lastBedrockFallbackCallTime;
+  if (timeSinceLast < BEDROCK_MIN_INTERVAL_MS) {
+    await sleepWithHeartbeat(BEDROCK_MIN_INTERVAL_MS - timeSinceLast, onHeartbeat);
   }
-  lastGroqFallbackCallTime = Date.now();
+  lastBedrockFallbackCallTime = Date.now();
 }
 
-async function markInteractiveGroqPending(priority: GroqPriority) {
+async function markInteractiveBedrockPending(priority: BedrockPriority) {
   if (priority !== "interactive") return false;
 
   try {
-    await redis.incr(GROQ_INTERACTIVE_PENDING_KEY);
-    await redis.expire(GROQ_INTERACTIVE_PENDING_KEY, 15 * 60);
+    await redis.incr(BEDROCK_INTERACTIVE_PENDING_KEY);
+    await redis.expire(BEDROCK_INTERACTIVE_PENDING_KEY, 15 * 60);
     return true;
   } catch (error: any) {
-    console.warn(`[AI-Groq] Interactive priority marker unavailable: ${error?.message ?? error}`);
+    console.warn(`[AI-Bedrock] Interactive priority marker unavailable: ${error?.message ?? error}`);
     return false;
   }
 }
 
-async function clearInteractiveGroqPending(marked: boolean) {
+async function clearInteractiveBedrockPending(marked: boolean) {
   if (!marked) return;
 
   try {
-    await redis.eval(RELEASE_INTERACTIVE_PENDING_SCRIPT, 1, GROQ_INTERACTIVE_PENDING_KEY);
+    await redis.eval(RELEASE_INTERACTIVE_PENDING_SCRIPT, 1, BEDROCK_INTERACTIVE_PENDING_KEY);
   } catch (error: any) {
-    console.warn(`[AI-Groq] Interactive priority cleanup failed: ${error?.message ?? error}`);
+    console.warn(`[AI-Bedrock] Interactive priority cleanup failed: ${error?.message ?? error}`);
   }
 }
 
-async function waitForInteractiveGroqPriority(priority: GroqPriority, onHeartbeat?: () => Promise<void>) {
+async function waitForInteractiveBedrockPriority(priority: BedrockPriority, onHeartbeat?: () => Promise<void>) {
   if (priority !== "background") return;
 
   while (true) {
     let pending = 0;
     try {
-      pending = Number(await redis.get(GROQ_INTERACTIVE_PENDING_KEY) ?? "0");
+      pending = Number(await redis.get(BEDROCK_INTERACTIVE_PENDING_KEY) ?? "0");
     } catch (error: any) {
-      console.warn(`[AI-Groq] Priority check failed: ${error?.message ?? error}`);
+      console.warn(`[AI-Bedrock] Priority check failed: ${error?.message ?? error}`);
       return;
     }
 
     if (pending <= 0) return;
 
-    const waitTime = Math.min(Math.max(GROQ_MIN_INTERVAL_MS, 1000), 30000);
-    console.log(`[AI-Groq] Interactive request pending; background waiting ${Math.ceil(waitTime / 1000)}s...`);
+    const waitTime = Math.min(Math.max(BEDROCK_MIN_INTERVAL_MS, 1000), 30000);
+    console.log(`[AI-Bedrock] Interactive request pending; background waiting ${Math.ceil(waitTime / 1000)}s...`);
     await sleepWithHeartbeat(waitTime, onHeartbeat);
   }
 }
 
-async function markGroqRateLimited() {
-  groqPauseUntil = Date.now() + GROQ_COOLDOWN_MS;
+async function markBedrockRateLimited() {
+  bedrockPauseUntil = Date.now() + BEDROCK_COOLDOWN_MS;
   try {
     await redis.set(
-      GROQ_COOLDOWN_KEY,
-      String(groqPauseUntil),
+      BEDROCK_COOLDOWN_KEY,
+      String(bedrockPauseUntil),
       "PX",
-      String(GROQ_COOLDOWN_MS + 60000)
+      String(BEDROCK_COOLDOWN_MS + 60000)
     );
   } catch (error: any) {
-    console.warn(`[AI-Groq] Failed to write shared cooldown: ${error?.message ?? error}`);
+    console.warn(`[AI-Bedrock] Failed to write shared cooldown: ${error?.message ?? error}`);
   }
 }
 
@@ -305,16 +304,16 @@ export async function callNvidiaFast<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Groq AI queue shared by every container through Redis. Use for all Groq
+ * Bedrock AI queue shared by every container through Redis. Use for all Bedrock
  * completions, including background jobs and user-triggered streams.
  */
-export async function callGroqProvider<T>(
+export async function callBedrockProvider<T>(
   fn: () => Promise<T>,
   onHeartbeat?: () => Promise<void>,
-  priority: GroqPriority = defaultGroqPriority()
+  priority: BedrockPriority = defaultBedrockPriority()
 ): Promise<T> {
-  const currentLink = groqQueue;
-  const interactivePending = markInteractiveGroqPending(priority);
+  const currentLink = bedrockQueue;
+  const interactivePending = markInteractiveBedrockPending(priority);
 
   const nextLink = (async () => {
     let isWaiting = true;
@@ -328,16 +327,16 @@ export async function callGroqProvider<T>(
       if (heartbeatInterval) clearInterval(heartbeatInterval);
 
       return await withRetry(async () => {
-        await waitForGroqCooldown(onHeartbeat);
-        await waitForInteractiveGroqPriority(priority, onHeartbeat);
-        await acquireSharedGroqSlot(onHeartbeat);
+        await waitForBedrockCooldown(onHeartbeat);
+        await waitForInteractiveBedrockPriority(priority, onHeartbeat);
+        await acquireSharedBedrockSlot(onHeartbeat);
 
         try {
           return await fn();
         } catch (error: any) {
-          if (error?.status === 429) {
-            console.warn(`[AI-Groq] 429 received. Suspending Groq calls for ${Math.ceil(GROQ_COOLDOWN_MS / 1000)}s...`);
-            await markGroqRateLimited();
+          if (error?.status === 429 || error?.$metadata?.httpStatusCode === 429 || ["ThrottlingException", "TooManyRequestsException"].includes(error?.name)) {
+            console.warn(`[AI-Bedrock] rate limited. Suspending Bedrock calls for ${Math.ceil(BEDROCK_COOLDOWN_MS / 1000)}s...`);
+            await markBedrockRateLimited();
           }
           throw error;
         }
@@ -345,11 +344,11 @@ export async function callGroqProvider<T>(
     } catch (e) {
       throw e;
     } finally {
-      await clearInteractiveGroqPending(await interactivePending);
+      await clearInteractiveBedrockPending(await interactivePending);
     }
   })();
 
-  groqQueue = nextLink.catch(() => {});
+  bedrockQueue = nextLink.catch(() => {});
   return nextLink;
 }
 

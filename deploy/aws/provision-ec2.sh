@@ -102,6 +102,40 @@ JSON
 aws iam put-role-policy --role-name "${ROLE_NAME}" --policy-name "${POLICY_NAME}" --policy-document "file://${INSTANCE_POLICY}" >/dev/null
 rm -f "${INSTANCE_POLICY}"
 
+BEDROCK_POLICY="$(mktemp)"
+cat > "${BEDROCK_POLICY}" <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeNovaMicroAPAC",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": [
+        "arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/apac.amazon.nova-micro-v1:0",
+        "arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-micro-v1:0",
+        "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.nova-micro-v1:0",
+        "arn:aws:bedrock:ap-south-1::foundation-model/amazon.nova-micro-v1:0",
+        "arn:aws:bedrock:ap-northeast-2::foundation-model/amazon.nova-micro-v1:0",
+        "arn:aws:bedrock:ap-southeast-1::foundation-model/amazon.nova-micro-v1:0",
+        "arn:aws:bedrock:ap-northeast-3::foundation-model/amazon.nova-micro-v1:0"
+      ]
+    },
+    {
+      "Sid": "InvokeTitanEmbeddingsV2",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.titan-embed-text-v2:0"
+    }
+  ]
+}
+JSON
+aws iam put-role-policy \
+  --role-name "${ROLE_NAME}" \
+  --policy-name "${PROJECT_NAME}-prod-bedrock-policy" \
+  --policy-document "file://${BEDROCK_POLICY}" >/dev/null
+rm -f "${BEDROCK_POLICY}"
+
 if ! aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" >/dev/null 2>&1; then
   aws iam create-instance-profile --instance-profile-name "${PROFILE_NAME}" >/dev/null
 fi
@@ -120,7 +154,7 @@ cat > "${USER_DATA}" <<EOF
 #!/bin/bash
 set -euxo pipefail
 dnf update -y
-dnf install -y docker git awscli cronie curl
+dnf install -y docker git awscli cronie
 arch="\$(uname -m)"
 case "\${arch}" in
   aarch64|arm64) compose_arch="aarch64"; buildx_arch="arm64" ;;

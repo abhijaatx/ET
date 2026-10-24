@@ -1,32 +1,35 @@
-import { hasUsableNvidiaKey, nvidia } from "./nvidia_client";
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { env } from "../env";
 
-/**
- * High-availability embedding generation using hosted NVIDIA models.
- * Uses nv-embedqa-e5-v5 and truncates to 384 dims to match the existing DB schema
- * without requiring a migration.
- */
+const bedrock = new BedrockRuntimeClient({ region: env.BEDROCK_REGION });
+const EMBEDDING_DIMENSIONS = 256;
+const DATABASE_DIMENSIONS = 384;
+
+/** Generate a low-cost Titan Text Embeddings V2 vector for an article. */
 export async function embedText(text: string): Promise<number[]> {
-  if (!hasUsableNvidiaKey()) {
-    return new Array(384).fill(0);
-  }
-
   try {
-    const response = await (nvidia as any).embeddings.create({
-      model: "nvidia/nv-embedqa-e5-v5",
-      input: text,
-      encoding_format: "float",
-      input_type: "passage", // Required for asymmetric models
-      truncate: "END",
-    });
+    const result = await bedrock.send(new InvokeModelCommand({
+      modelId: "amazon.titan-embed-text-v2:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: new TextEncoder().encode(JSON.stringify({
+        inputText: text,
+        dimensions: EMBEDDING_DIMENSIONS,
+        normalize: true,
+      })),
+    }));
 
-    const embedding: number[] = response.data[0]?.embedding;
-    if (!embedding) throw new Error("No embedding returned from NVIDIA");
+    const payload = JSON.parse(new TextDecoder().decode(result.body));
+    const embedding = payload.embedding;
+    if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
+      throw new Error("Titan returned an invalid embedding");
+    }
 
-    // Truncate to 384 dims to match existing DB vector(384) columns.
-    // This avoids a DB migration while still using the hosted API.
-    return embedding.slice(0, 384);
+    // Keep the existing vector(384) database schema; zero padding preserves
+    // the unit norm of Titan's normalized 256-dimensional embedding.
+    return [...embedding, ...new Array(DATABASE_DIMENSIONS - EMBEDDING_DIMENSIONS).fill(0)];
   } catch (error: any) {
-    console.error(`[Embeddings] NVIDIA Error: ${error.message}. Falling back to zero-vector.`);
-    return new Array(384).fill(0);
+    console.error(`[Embeddings] Amazon Bedrock error: ${error.message}. Falling back to zero-vector.`);
+    return new Array(DATABASE_DIMENSIONS).fill(0);
   }
 }

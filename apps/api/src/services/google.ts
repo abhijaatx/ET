@@ -6,7 +6,7 @@ export async function googleCompletion(
   userPrompt: string,
   options: GeminiCompletionOptions = {}
 ): Promise<string> {
-  console.log(`[AI] Using primary Groq text model for translation...`);
+  console.log(`[AI] Using Amazon Bedrock for translation...`);
   const jsonInstruction = options.responseMimeType === "application/json"
     ? "\n\nReturn only valid JSON. Do not include markdown fences or explanatory text."
     : "";

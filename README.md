@@ -19,7 +19,7 @@ ET is a full-stack AI news platform for Economic Times-style financial news. It 
 
 - **Frontend:** Next.js 14, React, Tailwind CSS, Framer Motion.
 - **API:** Node.js, TypeScript, Hono, Lucia Auth.
-- **AI:** Groq LLM streaming for interactive briefing chat, with support for other provider keys through environment config.
+- **AI:** Amazon Bedrock Nova Micro for text generation and Titan Text Embeddings V2 for article embeddings.
 - **Data:** PostgreSQL, pgvector, Drizzle ORM.
 - **Jobs:** Redis, BullMQ workers.
 - **Deployment:** AWS S3, CloudFront, EC2, Docker Compose, Caddy.
@@ -88,7 +88,7 @@ Required environment values:
 
 - `NEXTAUTH_SECRET`
 - `NEWSAPI_KEY` or `GNEWS_KEY`
-- `GROQ_API_KEY` for AI chat and briefing features
+- AWS credentials for Amazon Bedrock (the production EC2 instance role is configured automatically)
 - Database and Redis values are provided by Docker Compose for local development.
 
 Useful commands:
