@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useChat } from "ai/react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Bars3Icon } from "@heroicons/react/24/outline";
 import { TopNav } from "../../components/TopNav";
 import { Sidebar } from "../../components/Sidebar";
 import { SlideOver } from "../../components/SlideOver";
@@ -11,7 +13,7 @@ import { LanguageSelector } from "../../components/LanguageSelector";
 import { useAuthorProfile } from "../../context/AuthorProfileContext";
 import { PremiumAd } from "../../components/PremiumAd";
 import { BriefingStoryArc, type StoryArcData } from "../../components/BriefingStoryArc";
-import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star, Globe, X } from "lucide-react";
+import { LineChart, LayoutGrid, BookOpen, MessageSquare, Star, Globe, X, ChevronDown } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const STOCK_PHOTO = "https://images.pexels.com/photos/35012972/pexels-photo-35012972.jpeg";
@@ -71,7 +73,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 export default function BriefingPage() {
   const { openProfile } = useAuthorProfile();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const storyId = searchParams.get("storyId") ?? searchParams.get("story_id") ?? getLegacyStoryIdFromPath() ?? "";
@@ -395,6 +397,7 @@ export default function BriefingPage() {
 
   const displayedBriefing = currentLanguage === "en" ? briefing : (vernacularBriefing ?? briefing);
   const displayedStoryArc = currentLanguage === "en" ? storyArc : (vernacularStoryArc ?? storyArc);
+  const mobileView = activePane === "right" ? "primary-source" : view;
   const activeArticleTranslation =
     activeSource && currentLanguage !== "en"
       ? vernacularArticles[`${activeSource.id}_${currentLanguage}`]
@@ -405,9 +408,9 @@ export default function BriefingPage() {
       <motion.header 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="border-b border-mist bg-white/80 px-4 md:px-8 py-4 backdrop-blur-md shrink-0 z-20"
+        className="border-b border-mist bg-white/80 px-3 md:px-8 py-3 md:py-4 backdrop-blur-md shrink-0 z-20"
       >
-        <div className="flex items-center justify-between">
+        <div className="hidden md:flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <TopNav title="Intelligence Brief" onMenuClick={() => setIsAppDrawerOpen(true)} hideAuthInfo={true} />
             <button
@@ -433,6 +436,74 @@ export default function BriefingPage() {
           </div>
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] md:tracking-[0.3em] text-slate/50">
             {activePane === 'left' ? (view === 'briefing' ? 'Intelligence Brief' : 'Visual Story Arc') : 'Source Coverage'}
+          </div>
+        </div>
+        <div className="md:hidden">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsAppDrawerOpen(true)}
+              aria-label="Open navigation menu"
+              className="h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-ink hover:bg-mist/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-et-red/40"
+            >
+              <Bars3Icon className="h-6 w-6" />
+            </button>
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Choose a briefing view</span>
+              <select
+                aria-label="Briefing view"
+                value={mobileView}
+                onChange={(event) => {
+                  const selectedView = event.currentTarget.value;
+                  if (selectedView === "primary-source") {
+                    setActivePane("right");
+                  } else {
+                    setView(selectedView as "briefing" | "story-arc");
+                    setActivePane("left");
+                  }
+                }}
+                className="h-11 w-full min-w-0 appearance-none rounded-full border border-mist bg-white pl-4 pr-10 text-[13px] font-bold text-ink shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-et-red/30"
+              >
+                <option value="briefing">Intelligence Brief</option>
+                <option value="primary-source">Primary Source</option>
+                <option value="story-arc">Visual Story Arc</option>
+              </select>
+              <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/60" />
+            </label>
+            {!authLoading && !user && (
+              <Link
+                href="/login"
+                className="h-10 shrink-0 inline-flex items-center justify-center whitespace-nowrap rounded-full border border-mist bg-white px-3 text-[10px] font-bold uppercase tracking-wider text-ink hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-et-red/30"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 pl-[52px]">
+            <button
+              type="button"
+              onClick={() => setIsLanguageDrawerOpen(true)}
+              aria-label="Change language"
+              title="Change Language"
+              className="relative h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-slate/60 hover:bg-mist/10 hover:text-et-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-et-red/40"
+            >
+              <Globe className="h-5 w-5" />
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full border-2 border-white bg-et-red" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleFollow}
+              disabled={followLoading}
+              aria-pressed={isFollowed}
+              className={`h-11 shrink-0 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 text-[10px] font-black uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-et-red/40 disabled:opacity-60 ${
+                isFollowed
+                  ? "bg-et-red text-white"
+                  : "border border-mist bg-paper text-slate/60 hover:bg-white hover:text-et-red"
+              }`}
+            >
+              <Star aria-hidden="true" className={`h-3.5 w-3.5 ${isFollowed ? "fill-white" : ""}`} />
+              {isFollowed ? "Following Story" : "Follow Story"}
+            </button>
           </div>
         </div>
       </motion.header>
