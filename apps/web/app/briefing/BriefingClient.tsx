@@ -495,10 +495,10 @@ export default function BriefingPage() {
               onClick={toggleFollow}
               disabled={followLoading}
               aria-pressed={isFollowed}
-              className={`h-11 shrink-0 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 text-[10px] font-black uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-et-red/40 disabled:opacity-60 ${
+              className={`h-11 shrink-0 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 text-[11px] font-black uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-et-red/40 disabled:opacity-60 ${
                 isFollowed
                   ? "bg-et-red text-white"
-                  : "border border-mist bg-paper text-slate/60 hover:bg-white hover:text-et-red"
+                  : "border border-slate/20 bg-white text-ink hover:bg-paper hover:text-et-red"
               }`}
             >
               <Star aria-hidden="true" className={`h-3.5 w-3.5 ${isFollowed ? "fill-white" : ""}`} />
